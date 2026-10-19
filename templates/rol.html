@@ -36,7 +36,7 @@
 <section class="hoja" aria-labelledby="titulo-planilla">
   <div class="hoja-titulo">
     <h2 id="titulo-planilla">Lo que recibe cada empleado</h2>
-    <p>Abre la boleta para imprimir el comprobante individual.</p>
+    <p>Haz clic en un nombre para abrir su boleta imprimible.</p>
   </div>
   <div class="deslizable">
     <table class="tabla planilla">
@@ -46,7 +46,6 @@
           <th colspan="4" class="g-ingresos t-ingresos corte">Ingresos</th>
           <th colspan="4" class="g-descuentos t-descuentos corte">Descuentos</th>
           <th rowspan="2" class="num g-neto c-neto corte">Neto a recibir</th>
-          <th rowspan="2" class="no-imprimir"><span class="solo-lectura">Boleta</span></th>
         </tr>
         <tr>
           <th class="num corte">Sueldo</th><th class="num">Horas extra</th><th class="num">Comisiones</th><th class="num">Total</th>
@@ -56,7 +55,7 @@
       <tbody>
       {% for d in detalle %}
         <tr>
-          <td>{{ d.nombres }}<span class="secundario">{{ d.cargo }}{% if d.dias_trabajados < 30 %}, {{ d.dias_trabajados }} días trabajados{% endif %}</span></td>
+          <td><a href="{{ url_for('roles.boleta', rol_id=rol.id, det_id=d.id) }}">{{ d.nombres }}</a><span class="secundario">{{ d.cargo }}{% if d.dias_trabajados < 30 %}, {{ d.dias_trabajados }} días trabajados{% endif %}</span></td>
           <td class="num corte">{{ d.sueldo | money }}</td>
           <td class="num">{{ (d.valor_horas_50 + d.valor_horas_100 + d.valor_recargo_nocturno) | money }}</td>
           <td class="num">{{ d.comisiones | money }}</td>
@@ -66,7 +65,6 @@
           <td class="num">{{ d.otros_descuentos | money }}</td>
           <td class="num"><strong>{{ d.total_descuentos | money }}</strong></td>
           <td class="num c-neto corte">{{ d.neto_pagar | money }}</td>
-          <td class="num no-imprimir"><a class="boton-texto" href="{{ url_for('roles.boleta', rol_id=rol.id, det_id=d.id) }}">Ver boleta</a></td>
         </tr>
       {% endfor %}
       </tbody>
@@ -82,7 +80,6 @@
           <td class="num">{{ detalle | sum(attribute='otros_descuentos') | money }}</td>
           <td class="num">{{ rol.total_descuentos | money }}</td>
           <td class="num c-neto corte">{{ rol.total_neto | money }}</td>
-          <td class="no-imprimir"></td>
         </tr>
       </tfoot>
     </table>
