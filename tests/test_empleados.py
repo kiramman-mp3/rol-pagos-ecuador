@@ -49,4 +49,4 @@ def test_datos_demo_son_validos_y_no_se_duplican(client):
     client.post("/empleados/demo")
     client.post("/empleados/demo")
     html = client.get("/empleados").text
-    assert html.count("badge text-bg-success") == 6
+    assert html.count("estado-activo") == 6
