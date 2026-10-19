@@ -1,0 +1,58 @@
+{% extends "base.html" %}
+{% block title %}Roles de pago{% endblock %}
+{% block content %}
+<h1 class="h3 mb-3">Roles de pago</h1>
+
+<div class="card mb-4">
+  <div class="card-header">Generar rol mensual</div>
+  <div class="card-body">
+    <form method="get" action="{{ url_for('roles.generar') }}" class="row g-2 align-items-end">
+      <div class="col-sm-4 col-md-3">
+        <label class="form-label" for="mes">Mes</label>
+        <select class="form-select" id="mes" name="mes">
+          {% for nombre in MESES %}<option value="{{ loop.index }}" {{ 'selected' if loop.index == mes }}>{{ nombre }}</option>{% endfor %}
+        </select>
+      </div>
+      <div class="col-sm-4 col-md-2">
+        <label class="form-label" for="anio">Año</label>
+        <input class="form-control" id="anio" name="anio" type="number" min="2020" max="2100" value="{{ anio }}">
+      </div>
+      <div class="col-sm-4 col-md-3">
+        <button class="btn btn-primary w-100">Continuar: registrar novedades →</button>
+      </div>
+    </form>
+    <div class="form-text mt-2">Se procesan todos los empleados activos. Si el mes ya tiene rol, se reemplaza.</div>
+  </div>
+</div>
+
+<div class="card">
+  <div class="card-header">Historial</div>
+  <div class="table-responsive">
+    <table class="table table-hover align-middle mb-0">
+      <thead>
+        <tr><th>Período</th><th class="num">Empleados</th><th class="num">Ingresos</th>
+            <th class="num">Descuentos</th><th class="num">Neto a pagar</th>
+            <th class="num">Costo empleador</th><th></th></tr>
+      </thead>
+      <tbody>
+      {% for r in historial %}
+        <tr>
+          <td><a href="{{ url_for('roles.ver', rol_id=r.id) }}">{{ MESES[r.mes - 1] }} {{ r.anio }}</a></td>
+          <td class="num">{{ r.num_empleados }}</td>
+          <td class="num">{{ r.total_ingresos | money }}</td>
+          <td class="num">{{ r.total_descuentos | money }}</td>
+          <td class="num neto">{{ r.total_neto | money }}</td>
+          <td class="num">{{ r.total_costo | money }}</td>
+          <td class="text-end">
+            <a class="btn btn-sm btn-outline-primary" href="{{ url_for('roles.ver', rol_id=r.id) }}">Ver</a>
+            <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('roles.exportar', rol_id=r.id) }}">CSV</a>
+          </td>
+        </tr>
+      {% else %}
+        <tr><td colspan="7" class="text-center muted py-4">Todavía no se ha generado ningún rol.</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}
