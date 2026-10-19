@@ -1,0 +1,54 @@
+{% extends "base.html" %}
+{% block title %}Generar rol {{ MESES[mes - 1] }} {{ anio }}{% endblock %}
+{% block content %}
+<h1 class="h3 mb-1">Generar rol: {{ MESES[mes - 1] }} {{ anio }}</h1>
+<p class="muted">Registra las novedades del mes (opcionales). Lo que dejes en blanco cuenta como cero.</p>
+
+{% if existe %}
+<div class="alert alert-warning">Este mes ya tiene un rol generado. Al continuar se <strong>reemplazará</strong>.</div>
+{% endif %}
+
+<form method="post" action="{{ url_for('roles.generar') }}">
+  <input type="hidden" name="anio" value="{{ anio }}">
+  <input type="hidden" name="mes" value="{{ mes }}">
+  <div class="card mb-3">
+    <div class="table-responsive">
+      <table class="table align-middle mb-0">
+        <thead>
+          <tr>
+            <th>Empleado</th><th class="num">Sueldo base</th>
+            <th>H. suplem. <span class="muted">(+50%)</span></th>
+            <th>H. extraord. <span class="muted">(+100%)</span></th>
+            <th>H. nocturnas <span class="muted">(+25%)</span></th>
+            <th>Comisiones / bonos</th>
+            <th>Anticipos / otros desc.</th>
+          </tr>
+        </thead>
+        <tbody>
+        {% for e in empleados %}
+          {% set n = novedades.get(e.id) %}
+          <tr>
+            <td>{{ e.nombres }}<div class="small muted">{{ e.cargo }}</div></td>
+            <td class="num">{{ e.sueldo_base | money }}</td>
+            {% for campo, columna in [('h50', 'horas_50'), ('h100', 'horas_100'), ('hnoc', 'horas_nocturnas'), ('com', 'comisiones'), ('desc', 'otros_descuentos')] %}
+            <td><input class="form-control form-control-sm num" style="min-width:90px" type="number" step="0.01" min="0"
+                       name="{{ campo }}_{{ e.id }}" value="{{ n[columna] if n else 0 }}"></td>
+            {% endfor %}
+          </tr>
+        {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+  <div class="d-flex gap-2">
+    <button class="btn btn-primary">Generar rol de {{ empleados | length }} empleados</button>
+    <a class="btn btn-outline-secondary" href="{{ url_for('roles.lista') }}">Cancelar</a>
+  </div>
+</form>
+
+<p class="small muted mt-3 mb-0">
+  Valor hora = sueldo ÷ 240. Suplementarias: hora × 1.5. Extraordinarias (sáb., dom., feriados): hora × 2.
+  Nocturnas: solo se suma el recargo del 25% (la hora base ya está en el sueldo).
+  Quien ingresa durante el mes cobra los días proporcionales.
+</p>
+{% endblock %}

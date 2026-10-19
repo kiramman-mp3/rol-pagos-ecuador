@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}Rol de Pagos{% endblock %} · Ecuador 2026</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='vendor/bootstrap.min.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+  <nav class="navbar navbar-expand navbar-dark app-nav d-print-none">
+    <div class="container">
+      <a class="navbar-brand fw-semibold" href="{{ url_for('inicio') }}">Rol de Pagos <span class="badge text-bg-light ms-1">EC 2026</span></a>
+      <div class="navbar-nav">
+        <a class="nav-link {{ 'active' if request.endpoint and request.endpoint.startswith('empleado') }}" href="{{ url_for('empleados') }}">Empleados</a>
+        <a class="nav-link {{ 'active' if request.blueprint == 'roles' }}" href="{{ url_for('roles.lista') }}">Roles de pago</a>
+      </div>
+    </div>
+  </nav>
+
+  <main class="container py-4">
+    {% for categoria, mensaje in get_flashed_messages(with_categories=true) %}
+      <div class="alert alert-{{ categoria }} d-print-none" role="alert">{{ mensaje }}</div>
+    {% endfor %}
+    {% block content %}{% endblock %}
+  </main>
+</body>
+</html>
