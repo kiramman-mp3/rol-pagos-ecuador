@@ -19,7 +19,7 @@ def test_generar_procesa_a_todos_los_activos(client):
     cargar_demo(client)
     client.post("/empleados/2/estado")            # un inactivo no entra al rol
     r = generar(client)
-    assert r.status_code == 200 and "Rol de Pagos" in r.text
+    assert r.status_code == 200 and "Neto a pagar a 5 empleados" in r.text
     cab = filas(client, "SELECT * FROM roles_cabecera")[0]
     assert cab["num_empleados"] == 5
 
@@ -45,7 +45,7 @@ def test_novedades_se_aplican_y_se_recuerdan(client):
     assert d["total_ingresos"] == 2112.5
     assert d["otros_descuentos"] == 30
     html = client.get("/roles/generar?anio=2026&mes=10").text
-    assert 'name="com_2" value="200.0"' in html and "reemplazará" in html
+    assert 'name="com_2" value="200"' in html and "reemplazará" in html
 
 
 def test_regenerar_reemplaza_el_rol_del_mes(client):
