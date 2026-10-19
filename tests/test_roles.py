@@ -45,7 +45,7 @@ def test_novedades_se_aplican_y_se_recuerdan(client):
     assert d["total_ingresos"] == 2112.5
     assert d["otros_descuentos"] == 30
     html = client.get("/roles/generar?anio=2026&mes=10").text
-    assert 'name="com_2" value="200.0"' in html and "reemplazará" in html
+    assert 'name="com_2" value="200"' in html and "reemplazará" in html
 
 
 def test_regenerar_reemplaza_el_rol_del_mes(client):

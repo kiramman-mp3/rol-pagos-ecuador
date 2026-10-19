@@ -42,7 +42,7 @@
             <td class="num">{{ e.sueldo_base | money }}</td>
             {% for campo, columna, etiqueta in [('h50', 'horas_50', 'Horas suplementarias'), ('h100', 'horas_100', 'Horas extraordinarias'), ('hnoc', 'horas_nocturnas', 'Horas nocturnas'), ('com', 'comisiones', 'Comisiones y bonos'), ('desc', 'otros_descuentos', 'Anticipos y otros descuentos')] %}
             <td class="{{ 'corte' if campo in ('h50', 'desc') }}"><input class="entrada entrada-compacta num" type="number" step="0.01" min="0" inputmode="decimal"
-                       name="{{ campo }}_{{ e.id }}" value="{{ n[columna] if n else 0 }}" aria-label="{{ etiqueta }} de {{ e.nombres }}"></td>
+                       name="{{ campo }}_{{ e.id }}" value="{{ '%g' % n[columna] if n and n[columna] else '' }}" placeholder="0" aria-label="{{ etiqueta }} de {{ e.nombres }}"></td>
             {% endfor %}
           </tr>
         {% endfor %}
