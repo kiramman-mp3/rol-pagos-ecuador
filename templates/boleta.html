@@ -1,0 +1,74 @@
+{% extends "base.html" %}
+{% block title %}Rol de {{ d.nombres }}{% endblock %}
+{% block content %}
+<div class="d-print-none mb-3 d-flex gap-2">
+  <a class="btn btn-outline-secondary" href="{{ url_for('roles.ver', rol_id=rol.id) }}">← Volver al rol</a>
+  <button class="btn btn-primary" onclick="window.print()">Imprimir</button>
+</div>
+
+<div class="boleta card">
+  <div class="text-center mb-3">
+    <div class="fw-bold">{{ EMPRESA.nombre }}</div>
+    <div class="small muted">RUC {{ EMPRESA.ruc }}</div>
+    <h2 class="mt-2 mb-0">Rol de Pagos</h2>
+    <div class="muted">{{ MESES[rol.mes - 1] }} {{ rol.anio }}</div>
+  </div>
+
+  <div class="row small mb-3">
+    <div class="col-7"><strong>Empleado:</strong> {{ d.nombres }}<br><strong>Cargo:</strong> {{ d.cargo }}</div>
+    <div class="col-5"><strong>Cédula:</strong> {{ d.cedula }}<br><strong>Ingreso:</strong> {{ d.fecha_ingreso }}</div>
+  </div>
+
+  <div class="row g-4">
+    <div class="col-md-6">
+      <table class="table table-sm">
+        <thead><tr><th colspan="2">Ingresos</th></tr></thead>
+        <tbody>
+          <tr><td>Sueldo{% if d.dias_trabajados < 30 %} ({{ d.dias_trabajados }} días){% endif %}</td><td class="num">{{ d.sueldo | money }}</td></tr>
+          {% if d.horas_50 %}<tr><td>Horas suplementarias 50% ({{ d.horas_50 | round(2) }} h)</td><td class="num">{{ d.valor_horas_50 | money }}</td></tr>{% endif %}
+          {% if d.horas_100 %}<tr><td>Horas extraordinarias 100% ({{ d.horas_100 | round(2) }} h)</td><td class="num">{{ d.valor_horas_100 | money }}</td></tr>{% endif %}
+          {% if d.horas_nocturnas %}<tr><td>Recargo nocturno 25% ({{ d.horas_nocturnas | round(2) }} h)</td><td class="num">{{ d.valor_recargo_nocturno | money }}</td></tr>{% endif %}
+          {% if d.comisiones %}<tr><td>Comisiones / bonos</td><td class="num">{{ d.comisiones | money }}</td></tr>{% endif %}
+        </tbody>
+        <tfoot><tr class="fw-bold"><td>Total ingresos</td><td class="num">{{ d.total_ingresos | money }}</td></tr></tfoot>
+      </table>
+    </div>
+    <div class="col-md-6">
+      <table class="table table-sm">
+        <thead><tr><th colspan="2">Descuentos</th></tr></thead>
+        <tbody>
+          <tr><td>Aporte personal IESS (9.45%)</td><td class="num">{{ d.aporte_iess | money }}</td></tr>
+          <tr><td>Impuesto a la renta</td><td class="num">{{ d.impuesto_renta | money }}</td></tr>
+          {% if d.otros_descuentos %}<tr><td>Anticipos / otros</td><td class="num">{{ d.otros_descuentos | money }}</td></tr>{% endif %}
+        </tbody>
+        <tfoot><tr class="fw-bold"><td>Total descuentos</td><td class="num">{{ d.total_descuentos | money }}</td></tr></tfoot>
+      </table>
+    </div>
+  </div>
+
+  <div class="d-flex justify-content-between align-items-center border rounded p-3 my-3">
+    <span class="fs-5 fw-semibold">Neto a recibir</span>
+    <span class="fs-3 neto">{{ d.neto_pagar | money }}</span>
+  </div>
+
+  <div class="small muted">
+    Base IR anual proyectada: {{ d.base_ir_anual | money }} · IR anual: {{ d.ir_anual | money }} ÷ 12.
+  </div>
+
+  <table class="table table-sm mt-3 provision-card">
+    <thead><tr><th colspan="2">Provisiones a cargo del empleador (informativo)</th></tr></thead>
+    <tbody>
+      <tr><td>Décimo tercer sueldo</td><td class="num">{{ d.decimo_tercero | money }}</td></tr>
+      <tr><td>Décimo cuarto sueldo</td><td class="num">{{ d.decimo_cuarto | money }}</td></tr>
+      <tr><td>Vacaciones</td><td class="num">{{ d.vacaciones | money }}</td></tr>
+      <tr><td>Fondos de reserva</td><td class="num">{{ d.fondos_reserva | money }}</td></tr>
+      <tr><td>Aporte patronal IESS (11.15%)</td><td class="num">{{ d.aporte_patronal | money }}</td></tr>
+    </tbody>
+  </table>
+
+  <div class="row firmas">
+    <div class="col-6"><div class="firma">Empleador</div></div>
+    <div class="col-6"><div class="firma">Recibí conforme · CI {{ d.cedula }}</div></div>
+  </div>
+</div>
+{% endblock %}

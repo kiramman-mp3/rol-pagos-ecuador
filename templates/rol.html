@@ -1,0 +1,128 @@
+{% extends "base.html" %}
+{% block title %}Rol {{ MESES[rol.mes - 1] }} {{ rol.anio }}{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-start mb-3 flex-wrap gap-2">
+  <div>
+    <h1 class="h3 mb-0">Rol de Pagos: {{ MESES[rol.mes - 1] }} {{ rol.anio }}</h1>
+    <div class="muted">{{ EMPRESA.nombre }} · RUC {{ EMPRESA.ruc }} · generado {{ rol.generado_en.replace('T', ' ') }}</div>
+  </div>
+  <div class="d-flex gap-2 d-print-none">
+    <a class="btn btn-outline-secondary" href="{{ url_for('roles.generar', anio=rol.anio, mes=rol.mes) }}">Recalcular</a>
+    <a class="btn btn-outline-secondary" href="{{ url_for('roles.exportar', rol_id=rol.id) }}">Exportar CSV</a>
+    <button class="btn btn-outline-secondary" onclick="window.print()">Imprimir</button>
+    <form method="post" action="{{ url_for('roles.eliminar', rol_id=rol.id) }}" onsubmit="return confirm('¿Eliminar este rol?')">
+      <button class="btn btn-outline-danger">Eliminar</button>
+    </form>
+  </div>
+</div>
+
+<div class="row g-3 mb-4">
+  <div class="col-6 col-lg-3"><div class="card"><div class="card-body">
+    <div class="muted small">Total ingresos</div><div class="h4 mb-0">{{ rol.total_ingresos | money }}</div></div></div></div>
+  <div class="col-6 col-lg-3"><div class="card"><div class="card-body">
+    <div class="muted small">Total descuentos</div><div class="h4 mb-0">{{ rol.total_descuentos | money }}</div></div></div></div>
+  <div class="col-6 col-lg-3"><div class="card"><div class="card-body">
+    <div class="muted small">Neto a pagar</div><div class="h4 mb-0 neto">{{ rol.total_neto | money }}</div></div></div></div>
+  <div class="col-6 col-lg-3"><div class="card provision-card"><div class="card-body">
+    <div class="muted small">Costo total empleador</div><div class="h4 mb-0">{{ rol.total_costo | money }}</div></div></div></div>
+</div>
+
+<div class="card mb-4">
+  <div class="card-header">Rol de pagos: lo que recibe cada empleado</div>
+  <div class="table-responsive">
+    <table class="table table-hover align-middle mb-0">
+      <thead>
+        <tr>
+          <th rowspan="2">Empleado</th>
+          <th colspan="4" class="text-center">Ingresos</th>
+          <th colspan="4" class="text-center">Descuentos</th>
+          <th rowspan="2" class="num">Neto a recibir</th>
+          <th rowspan="2"></th>
+        </tr>
+        <tr>
+          <th class="num">Sueldo</th><th class="num">H. extras</th><th class="num">Comisiones</th><th class="num">Total</th>
+          <th class="num">IESS 9.45%</th><th class="num">Imp. renta</th><th class="num">Otros</th><th class="num">Total</th>
+        </tr>
+      </thead>
+      <tbody>
+      {% for d in detalle %}
+        <tr>
+          <td>{{ d.nombres }}<div class="small muted">{{ d.cargo }}{% if d.dias_trabajados < 30 %} · {{ d.dias_trabajados }} días{% endif %}</div></td>
+          <td class="num">{{ d.sueldo | money }}</td>
+          <td class="num">{{ (d.valor_horas_50 + d.valor_horas_100 + d.valor_recargo_nocturno) | money }}</td>
+          <td class="num">{{ d.comisiones | money }}</td>
+          <td class="num fw-semibold">{{ d.total_ingresos | money }}</td>
+          <td class="num">{{ d.aporte_iess | money }}</td>
+          <td class="num">{{ d.impuesto_renta | money }}</td>
+          <td class="num">{{ d.otros_descuentos | money }}</td>
+          <td class="num fw-semibold">{{ d.total_descuentos | money }}</td>
+          <td class="num neto">{{ d.neto_pagar | money }}</td>
+          <td class="text-end d-print-none"><a class="btn btn-sm btn-outline-primary" href="{{ url_for('roles.boleta', rol_id=rol.id, det_id=d.id) }}">Boleta</a></td>
+        </tr>
+      {% endfor %}
+      </tbody>
+      <tfoot>
+        <tr class="table-light fw-bold">
+          <td>TOTALES</td>
+          <td class="num">{{ detalle | sum(attribute='sueldo') | money }}</td>
+          <td class="num">{{ (detalle | sum(attribute='valor_horas_50') + detalle | sum(attribute='valor_horas_100') + detalle | sum(attribute='valor_recargo_nocturno')) | money }}</td>
+          <td class="num">{{ detalle | sum(attribute='comisiones') | money }}</td>
+          <td class="num">{{ rol.total_ingresos | money }}</td>
+          <td class="num">{{ detalle | sum(attribute='aporte_iess') | money }}</td>
+          <td class="num">{{ detalle | sum(attribute='impuesto_renta') | money }}</td>
+          <td class="num">{{ detalle | sum(attribute='otros_descuentos') | money }}</td>
+          <td class="num">{{ rol.total_descuentos | money }}</td>
+          <td class="num neto">{{ rol.total_neto | money }}</td>
+          <td class="d-print-none"></td>
+        </tr>
+      </tfoot>
+    </table>
+  </div>
+</div>
+
+<div class="card provision-card">
+  <div class="card-header">Costo empleador y provisiones <span class="fw-normal">(informativo: no se descuenta al trabajador)</span></div>
+  <div class="table-responsive">
+    <table class="table table-hover align-middle mb-0">
+      <thead>
+        <tr>
+          <th>Empleado</th><th class="num">Décimo 3ro</th><th class="num">Décimo 4to</th>
+          <th class="num">Vacaciones</th><th class="num">Fondos reserva</th>
+          <th class="num">Aporte patronal 11.15%</th><th class="num">Total provisiones</th>
+          <th class="num">Costo empleador</th>
+        </tr>
+      </thead>
+      <tbody>
+      {% for d in detalle %}
+        <tr>
+          <td>{{ d.nombres }}</td>
+          <td class="num">{{ d.decimo_tercero | money }}</td>
+          <td class="num">{{ d.decimo_cuarto | money }}</td>
+          <td class="num">{{ d.vacaciones | money }}</td>
+          <td class="num">{% if d.fondos_reserva %}{{ d.fondos_reserva | money }}{% else %}<span class="muted" title="Aplica desde el mes 13">n/a</span>{% endif %}</td>
+          <td class="num">{{ d.aporte_patronal | money }}</td>
+          <td class="num fw-semibold">{{ d.total_provisiones | money }}</td>
+          <td class="num fw-semibold">{{ d.costo_empleador | money }}</td>
+        </tr>
+      {% endfor %}
+      </tbody>
+      <tfoot>
+        <tr class="table-light fw-bold">
+          <td>TOTALES</td>
+          <td class="num">{{ detalle | sum(attribute='decimo_tercero') | money }}</td>
+          <td class="num">{{ detalle | sum(attribute='decimo_cuarto') | money }}</td>
+          <td class="num">{{ detalle | sum(attribute='vacaciones') | money }}</td>
+          <td class="num">{{ detalle | sum(attribute='fondos_reserva') | money }}</td>
+          <td class="num">{{ detalle | sum(attribute='aporte_patronal') | money }}</td>
+          <td class="num">{{ rol.total_provisiones | money }}</td>
+          <td class="num">{{ rol.total_costo | money }}</td>
+        </tr>
+      </tfoot>
+    </table>
+  </div>
+  <div class="card-body small muted">
+    Costo empleador = total ingresos + provisiones. Décimo 4to sobre el SBU ($482); décimo 3ro sobre el total de ingresos;
+    vacaciones 1/24 del sueldo; fondos de reserva 8.33% desde el mes 13.
+  </div>
+</div>
+{% endblock %}
