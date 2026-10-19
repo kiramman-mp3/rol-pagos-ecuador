@@ -8,11 +8,14 @@ from pathlib import Path
 from flask import Flask, flash, redirect, render_template, request, url_for
 
 import db
+from roles import bp as roles_bp
 from validaciones import a_decimal, a_fecha, cedula_valida
 
 MESES = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio",
          "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"]
 CONTRATOS = ["Indefinido", "Plazo fijo", "Eventual", "Ocasional", "Obra o servicio"]
+
+EMPRESA = {"nombre": "Empresa Demo S.A.", "ruc": "1790000000001"}  # editar para el taller
 
 EMPLEADOS_DEMO = [
     ("1801234566", "María Fernanda Paredes", "Gerente General", 4500, "2019-03-01", "Indefinido"),
@@ -31,6 +34,7 @@ def create_app(config=None):
     if config:
         app.config.update(config)
     db.init_app(app)
+    app.register_blueprint(roles_bp)
 
     @app.template_filter("money")
     def money(valor):
@@ -38,7 +42,7 @@ def create_app(config=None):
 
     @app.context_processor
     def globales():
-        return {"MESES": MESES, "CONTRATOS": CONTRATOS}
+        return {"MESES": MESES, "CONTRATOS": CONTRATOS, "EMPRESA": EMPRESA}
 
     # --- Empleados ---------------------------------------------------------
     @app.get("/")
