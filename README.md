@@ -1,6 +1,6 @@
 # Rol de Pagos Ecuador 2026
 
-Módulo demostrativo de nómina para un ERP simplificado. Flask + SQLite + Bootstrap, sin Docker ni build.
+Módulo demostrativo de nómina para un ERP simplificado. Flask + SQLite + CSS propio, sin Docker ni build.
 
 ## Ejecutar
 
@@ -29,8 +29,15 @@ La base `rol_pagos.db` se crea sola al arrancar (borrarla reinicia todo).
 | `app.py` / `roles.py` | Rutas de empleados y de roles |
 | `schema.sql` / `db.py` | 4 tablas y conexión SQLite |
 | `validaciones.py` | Cédula y conversión de números |
-| `templates/`, `static/` | Vistas (Bootstrap incluido localmente, funciona sin internet) |
+| `templates/`, `static/` | Vistas y `app.css` (tipografías incluidas en `static/fonts`, funciona sin internet) |
 | `tests/` | `pytest` |
+
+## Diseño
+
+Cuatro colores con significado fijo en toda la app: azul para ingresos, ladrillo para descuentos,
+verde para el neto y ámbar para provisiones. El rol abre con dos ecuaciones
+(`ingresos − descuentos = neto` e `ingresos + provisiones = costo empleador`) y la tabla
+repite esos colores en sus columnas. Las boletas se imprimen en una sola hoja.
 
 ## Reglas de cálculo
 
