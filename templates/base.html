@@ -3,24 +3,26 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>{% block title %}Rol de Pagos{% endblock %} · Ecuador 2026</title>
-  <link rel="stylesheet" href="{{ url_for('static', filename='vendor/bootstrap.min.css') }}">
-  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+  <title>{% block title %}Rol de pagos{% endblock %} | Rol de pagos</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='app.css') }}">
 </head>
 <body>
-  <nav class="navbar navbar-expand navbar-dark app-nav d-print-none">
-    <div class="container">
-      <a class="navbar-brand fw-semibold" href="{{ url_for('inicio') }}">Rol de Pagos <span class="badge text-bg-light ms-1">EC 2026</span></a>
-      <div class="navbar-nav">
-        <a class="nav-link {{ 'active' if request.endpoint and request.endpoint.startswith('empleado') }}" href="{{ url_for('empleados') }}">Empleados</a>
-        <a class="nav-link {{ 'active' if request.blueprint == 'roles' }}" href="{{ url_for('roles.lista') }}">Roles de pago</a>
-      </div>
+  <header class="barra">
+    <div class="barra-interior">
+      <a class="marca" href="{{ url_for('inicio') }}">Rol de pagos<small>Ecuador 2026</small></a>
+      <nav class="navegacion" aria-label="Principal">
+        <a href="{{ url_for('empleados') }}"
+           {% if request.endpoint and request.endpoint.startswith('empleado') %}aria-current="page"{% endif %}>Empleados</a>
+        <a href="{{ url_for('roles.lista') }}"
+           {% if request.blueprint == 'roles' %}aria-current="page"{% endif %}>Roles de pago</a>
+      </nav>
+      <span class="empresa">{{ EMPRESA.nombre }}</span>
     </div>
-  </nav>
+  </header>
 
-  <main class="container py-4">
+  <main class="pagina">
     {% for categoria, mensaje in get_flashed_messages(with_categories=true) %}
-      <div class="alert alert-{{ categoria }} d-print-none" role="alert">{{ mensaje }}</div>
+      <div class="aviso aviso-{{ categoria }} no-imprimir" role="status">{{ mensaje }}</div>
     {% endfor %}
     {% block content %}{% endblock %}
   </main>
