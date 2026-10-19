@@ -19,7 +19,7 @@ def test_generar_procesa_a_todos_los_activos(client):
     cargar_demo(client)
     client.post("/empleados/2/estado")            # un inactivo no entra al rol
     r = generar(client)
-    assert r.status_code == 200 and "Rol de Pagos" in r.text
+    assert r.status_code == 200 and "Neto a pagar a 5 empleados" in r.text
     cab = filas(client, "SELECT * FROM roles_cabecera")[0]
     assert cab["num_empleados"] == 5
 
