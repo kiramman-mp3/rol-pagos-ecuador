@@ -182,12 +182,32 @@ th.c-neto { background: var(--neto-fondo); }
 .ficha-puesto { display: grid; grid-template-columns: max-content 1fr; gap: .25rem 1rem; margin: .4rem 0 0; padding: .8rem 1rem; border: 1px solid var(--linea); border-radius: var(--radio); font-size: .9rem; }
 .ficha-puesto dt { font-weight: 600; }
 .ficha-puesto dd { margin: 0; }
-.puesto { border: 1px solid var(--linea); border-radius: var(--radio); padding: .9rem 1rem; margin-bottom: .8rem; }
-.puesto-raiz { border-width: 2px; }
-.puesto header { display: flex; justify-content: space-between; align-items: baseline; gap: 1rem; }
-.puesto h3 { margin: 0; font-size: 1.05rem; }
-.puesto .ficha-puesto { border: 0; padding: .4rem 0 0; margin: 0; }
-.acciones-puesto { margin-top: .4rem; }
+.acciones-puesto { margin-top: .8rem; }
+
+/* ---- Organigrama: árbol de arriba abajo con líneas de unión ---- */
+.arbol-contenedor { overflow-x: auto; padding-bottom: .5rem; }
+.arbol, .arbol ul { display: flex; justify-content: center; list-style: none; margin: 0; padding: 0; position: relative; }
+.arbol { min-width: max-content; margin-inline: auto; }
+.arbol ul { padding-top: 1.4rem; }
+.arbol ul::before { content: ""; position: absolute; top: 0; left: 50%; height: 1.4rem; border-left: 2px solid var(--linea); }
+.arbol li { display: flex; flex-direction: column; align-items: center; position: relative; padding: 1.4rem .5rem 0; }
+.arbol > li { padding-top: 0; }
+.arbol li::before, .arbol li::after { content: ""; position: absolute; top: 0; right: 50%; width: 50%; height: 1.4rem; border-top: 2px solid var(--linea); }
+.arbol li::after { right: auto; left: 50%; border-left: 2px solid var(--linea); }
+.arbol > li::before, .arbol > li::after { display: none; }
+.arbol li:only-child::before, .arbol li:only-child::after { display: none; }
+.arbol li:only-child { padding-top: 0; }
+.arbol li:first-child::before, .arbol li:last-child::after { border: 0 none; }
+.arbol li:last-child::before { border-right: 2px solid var(--linea); border-radius: 0 var(--radio) 0 0; }
+.arbol li:first-child::after { border-radius: var(--radio) 0 0 0; }
+
+.caja-puesto { display: flex; flex-direction: column; gap: .15rem; width: 12.5rem; padding: .7rem .8rem; text-align: center; font: inherit; color: var(--tinta); background: var(--hoja); border: 1px solid var(--linea); border-top: 3px solid var(--ingresos); border-radius: var(--radio); cursor: pointer; }
+.caja-puesto:hover { border-color: var(--ingresos); }
+.caja-puesto.activa { background: var(--ingresos-fondo); border-color: var(--ingresos); box-shadow: 0 0 0 2px var(--ingresos); }
+.caja-nombre { font-family: var(--display); font-weight: 700; font-size: .95rem; }
+.caja-persona { font-size: .9rem; font-weight: 600; }
+.caja-vacia { font-weight: 400; font-style: italic; color: var(--tinta-suave); }
+.caja-nivel { align-self: center; margin-top: .25rem; padding: .05rem .5rem; font-size: .75rem; color: var(--neto); background: var(--neto-fondo); border-radius: 99px; }
 .responsable { display: flex; align-items: baseline; gap: .6rem; margin: .5rem 0 .2rem; }
 .responsable strong { font-size: 1.05rem; }
 .sin-responsable { color: var(--tinta-suave); font-style: italic; }
