@@ -202,7 +202,7 @@ describe('FormularioEmpleado', () => {
   it('con puestos, primero se elige el puesto: muestra su ficha y fija el nivel, el sueldo y el cargo', async () => {
     const { fixture, el } = await abrir([...GRADOS, NIVEL_MINIMO], [PUESTO]);
     expect(el.querySelector('#puestoId')).not.toBeNull();
-    expect(el.querySelector('#escalaId')).toBeNull(); // el grado sale del puesto
+    expect(el.querySelector('#escalaId')).not.toBeNull(); // el nivel que le toca sigue a la vista
 
     escribir(el, 'puestoId', '31', 'change');
     fixture.detectChanges();
@@ -211,6 +211,20 @@ describe('FormularioEmpleado', () => {
     expect(el.querySelector('.ficha-puesto')!.textContent).toContain('B1: Supervisión general');
     expect(el.querySelector<HTMLInputElement>('#sueldoBase')!.value).toBe('495');
     expect(el.querySelector<HTMLInputElement>('#cargo')!.value).toBe('Administrador / Contador');
+    expect(el.querySelector<HTMLSelectElement>('#escalaId')!.value).toBe('21'); // el del puesto
+  });
+
+  it('con puestos, se puede elegir otro nivel: cambia el sueldo mínimo, no el cargo', async () => {
+    const otro: Grado = { ...NIVEL_MINIMO, id: 22, grado: 3, denominacion: 'B2: Supervisión técnica', rmu: 490, rmuMax: 650 };
+    const { fixture, el } = await abrir([...GRADOS, NIVEL_MINIMO, otro], [PUESTO]);
+    escribir(el, 'puestoId', '31', 'change');
+    fixture.detectChanges();
+
+    escribir(el, 'escalaId', '22', 'change');
+    fixture.detectChanges();
+    expect(el.querySelector<HTMLInputElement>('#sueldoBase')!.value).toBe('490');
+    expect(el.querySelector<HTMLInputElement>('#cargo')!.value).toBe('Administrador / Contador');
+    expect(el.querySelector('#escalaId option[value="22"]')!.textContent).toContain('a $650');
   });
 
   it('con puestos, no se guarda sin puesto y se envía el puesto y su grado', async () => {

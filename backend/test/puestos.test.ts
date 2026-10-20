@@ -95,12 +95,13 @@ describe("empleados y orgánico", () => {
       assert.equal((await api.get("/api/puestos/3")).json.empleados, 1);
     }));
 
-  it("rechaza un grado que no es el de referencia del puesto", () =>
+  it("deja elegir otro nivel de la misma escala, pero avisa que difiere del puesto", () =>
     conApi(async (api) => {
       const gerente = (await api.get("/api/puestos/1")).json;
       const r = await api.post("/api/empleados", { ...EMPLEADO, puestoId: PUESTO_AUXILIAR, escalaId: gerente.escalaId });
-      assert.equal(r.status, 400);
-      assert.match(r.json.errores[0], /no corresponde al puesto/);
+      assert.equal(r.status, 201);
+      assert.equal(r.json.escalaId, gerente.escalaId);
+      assert.match(r.json.avisos[0], /difiere de la referencia del puesto «Auxiliar de guardalmacén»/);
     }));
 
   it("el sueldo no puede ser menor al mínimo del nivel del puesto", () =>
