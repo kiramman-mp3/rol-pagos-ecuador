@@ -12,12 +12,24 @@ export interface Empleado {
   regimen: string;
   /** Solo para LOEP: 'servidor' u 'obrero' */
   categoriaLoep: string | null;
+  /** Grado de la escala salarial, si el sueldo sigue una escala */
+  escalaId: number | null;
   activo: boolean;
   /** Solo viene al crear o editar: avisos que no bloquean el guardado. */
   avisos?: string[];
 }
 
 export type DatosEmpleado = Omit<Empleado, 'id' | 'activo' | 'avisos'>;
+
+/** Un grado de la escala salarial con su remuneración mensual unificada. */
+export interface Grado {
+  id: number;
+  regimen: string;
+  grado: number;
+  denominacion: string;
+  rmu: number;
+  fuente: string;
+}
 
 export interface TramoIr {
   desde: number;
