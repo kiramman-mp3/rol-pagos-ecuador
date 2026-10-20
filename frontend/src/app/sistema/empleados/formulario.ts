@@ -138,7 +138,9 @@ const familiaDeNivel = (g: Grado) => g.denominacion.trim().charAt(0).toUpperCase
             <input class="entrada num" id="sueldoBase" type="number" step="0.01"
                    formControlName="sueldoBase" [readOnly]="exigeGrado() && !gradoElegido()?.esMinimo"
                    [min]="gradoElegido()?.esMinimo ? gradoElegido()!.rmu : 0.01" />
-            @if (parametros(); as p) {
+            @if (sueldoBajo(); as motivo) {
+              <span class="error-campo" role="alert">{{ motivo }}</span>
+            } @else if (parametros(); as p) {
               <span class="ayuda">El sueldo básico unificado de {{ p.anio }} es {{ p.sbu | dinero }}.</span>
             }
           </div>
@@ -274,6 +276,25 @@ export class FormularioEmpleado {
   });
   protected readonly gradoElegido = computed(() => this.grados().find((g) => String(g.id) === this.gradoId()));
 
+  private readonly sueldo = toSignal(this.form.controls.sueldoBase.valueChanges, {
+    initialValue: this.form.controls.sueldoBase.value,
+  });
+
+  /** Por qué el sueldo escrito no se puede registrar (menor al mínimo del nivel o al SBU), o null si está bien. */
+  protected readonly sueldoBajo = computed(() => {
+    const sueldo = this.sueldo();
+    if (sueldo === null || sueldo === undefined || sueldo <= 0) return null;
+    const nivel = this.gradoElegido();
+    if (nivel?.esMinimo && sueldo < nivel.rmu) {
+      return `No se puede registrar al empleado: el sueldo (${sueldo} USD) es menor al mínimo del nivel ${nivel.denominacion} (${nivel.rmu} USD).`;
+    }
+    const sbu = this.parametros()?.sbu;
+    if (sbu !== undefined && sueldo < sbu) {
+      return `No se puede registrar al empleado: el sueldo (${sueldo} USD) es menor al salario básico unificado (${sbu} USD).`;
+    }
+    return null;
+  });
+
   /** Si el régimen aplicado tiene escala, el grado es obligatorio y fija el sueldo. */
   protected readonly exigeGrado = computed(() => this.grados().length > 0);
 
@@ -381,9 +402,10 @@ export class FormularioEmpleado {
       this.avisos.error('Elige un grado de la escala salarial: el sueldo sale de la tabla.');
       return;
     }
-    const nivel = this.gradoElegido();
-    if (nivel?.esMinimo && (resto.sueldoBase ?? 0) < nivel.rmu) {
-      this.avisos.error(`El sueldo no puede ser menor al mínimo del nivel (${nivel.rmu} USD).`);
+    const motivo = this.sueldoBajo();
+    if (motivo) {
+      this.avisos.error(motivo);
+      window.scrollTo({ top: 0 });
       return;
     }
     if (this.form.invalid) {

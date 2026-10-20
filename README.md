@@ -36,7 +36,7 @@ La base `backend/data/rol_pagos.db` se crea sola al arrancar. Si ya existía de 
 | Hacer un rol de pagos | Empleados, novedades del mes, rol con neto y costo empleador, boleta imprimible y CSV | Roles de pago |
 | Que sea parametrizable | SBU, tabla del IR, regímenes y escala salarial se editan en pantalla, sin tocar el código | Parámetros |
 | Escoger el régimen: Código del Trabajo, LOSEP o LOEP | Cada empleado tiene su régimen; en la LOEP se indica además si es servidor u obrero | Empleados |
-| Salario básico | Se guarda por año; avisa si un sueldo queda por debajo y define el décimo cuarto | Parámetros, pestaña del año |
+| Salario básico | Se guarda por año; no se registra a un empleado con un sueldo por debajo (ni del SBU ni del mínimo de su nivel) y define el décimo cuarto | Parámetros, pestaña del año |
 | Escala salarial | Grados con su remuneración; al elegir uno se propone el sueldo y el cargo | Parámetros y Empleados |
 | Si recibe décimo tercero y décimo cuarto | Por empleado: no lo recibe, se paga cada mes en el rol o lo acumula | Empleados, sección de beneficios |
 | Si recibe horas extras | Por empleado y por régimen, con el recargo y el tope de cada uno | Empleados y novedades |

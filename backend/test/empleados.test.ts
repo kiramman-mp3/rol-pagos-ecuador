@@ -44,24 +44,33 @@ describe("API de empleados", () => {
     assert.match(repetida.json.errores[0], /Ya existe/);
   });
 
-  it("avisa, sin bloquear, si el sueldo es menor al SBU", async () => {
-    // el mínimo del nivel está por encima del SBU, así que se baja para llegar solo al aviso
+  it("no registra a un empleado con sueldo menor al SBU y lo dice", async () => {
+    // el mínimo del nivel está por encima del SBU, así que se baja para llegar solo a esa regla
     const nivel = (await api.get(`/api/escala/${NIVEL_E2_CT}`)).json;
     await api.put(`/api/escala/${NIVEL_E2_CT}`, { ...nivel, rmu: 300 });
     const r = await api.post("/api/empleados", { ...EMPLEADO, cedula: "0903456788", sueldoBase: 400 });
-    assert.equal(r.status, 201);
-    assert.match(r.json.avisos[0], /SBU/);
+    assert.equal(r.status, 400);
+    assert.match(r.json.errores[0], /No se puede registrar al empleado: el sueldo \(\$400\) es menor al salario básico unificado/);
+    assert.equal((await api.get("/api/empleados")).json.length, 1); // solo el del before: no se guardó
   });
 
-  it("el aviso del SBU usa el valor guardado en la base, no uno fijo", async () => {
+  it("no registra a un empleado con sueldo menor al mínimo de su nivel y lo dice", async () => {
+    const r = await api.post("/api/empleados", { ...EMPLEADO, cedula: "0903456788", puestoId: 1, escalaId: undefined, sueldoBase: 490 });
+    assert.equal(r.status, 400);
+    assert.match(r.json.errores[0], /No se puede registrar al empleado: el sueldo \(\$490\) es menor al mínimo del nivel A: Jefatura \(\$510\)/);
+  });
+
+  it("el SBU que se exige es el guardado en la base, no uno fijo", async () => {
     const propia = await iniciar();
     try {
       const tabla = (await propia.get("/api/parametros?anio=2026")).json.tablaIr;
       await propia.put("/api/parametros/2026", { sbu: 600, tablaIr: tabla });
       const r = await propia.post("/api/empleados", { ...EMPLEADO, sueldoBase: 550 });
-      assert.match(r.json.avisos[0], /\$600/);
-      const sin = await propia.post("/api/empleados", { ...EMPLEADO, cedula: "1702345677", sueldoBase: 650 });
-      assert.deepEqual(sin.json.avisos, []);
+      assert.equal(r.status, 400);
+      assert.match(r.json.errores[0], /\$600/);
+      const bien = await propia.post("/api/empleados", { ...EMPLEADO, cedula: "1702345677", sueldoBase: 650 });
+      assert.equal(bien.status, 201);
+      assert.deepEqual(bien.json.avisos, []);
     } finally {
       propia.cerrar();
     }

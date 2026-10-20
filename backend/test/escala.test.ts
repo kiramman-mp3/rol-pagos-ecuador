@@ -134,7 +134,7 @@ describe("empleados y escala salarial", () => {
       assert.equal(mayor.status, 201);
       const menor = await api.post("/api/empleados", { ...EMPLEADO, puestoId: 2, cedula: "1702345677", sueldoBase: 490, escalaId: b1.id });
       assert.equal(menor.status, 400);
-      assert.match(menor.json.errores[0], /no puede ser menor al mínimo del nivel B1: Supervisión general \(\$495\)/);
+      assert.match(menor.json.errores[0], /es menor al mínimo del nivel B1: Supervisión general \(\$495\)/);
     }));
 
   it("el Código del Trabajo exige elegir el puesto, del que sale el nivel", () =>

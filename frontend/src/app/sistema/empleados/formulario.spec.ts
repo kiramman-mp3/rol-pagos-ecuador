@@ -172,6 +172,24 @@ describe('FormularioEmpleado', () => {
     expect(http.expectOne('/api/empleados').request.body.sueldoBase).toBe(817);
   });
 
+  it('un sueldo menor al SBU no se registra y el mensaje lo dice', async () => {
+    const { fixture, el } = await abrir();
+    llenarBase(el);
+    escribir(el, 'sueldoBase', '300');
+    fixture.detectChanges();
+    expect(el.querySelector('.error-campo')!.textContent).toContain(
+      'No se puede registrar al empleado: el sueldo (300 USD) es menor al salario básico unificado (482 USD)',
+    );
+    el.querySelector('form')!.dispatchEvent(new Event('submit'));
+    http.expectNone('/api/empleados');
+
+    escribir(el, 'sueldoBase', '482');
+    fixture.detectChanges();
+    expect(el.querySelector('.error-campo')).toBeNull();
+    el.querySelector('form')!.dispatchEvent(new Event('submit'));
+    http.expectOne('/api/empleados');
+  });
+
   it('sin escala en el régimen, el sueldo se escribe a mano', async () => {
     const { el } = await abrir();
     expect(el.querySelector('#escalaId')).toBeNull();
@@ -189,6 +207,10 @@ describe('FormularioEmpleado', () => {
     expect(el.textContent).toContain('no puede ser menor a');
 
     escribir(el, 'sueldoBase', '400');
+    fixture.detectChanges();
+    expect(el.querySelector('.error-campo')!.textContent).toContain(
+      'No se puede registrar al empleado: el sueldo (400 USD) es menor al mínimo del nivel B1: Supervisión general (495 USD)',
+    );
     el.querySelector('form')!.dispatchEvent(new Event('submit'));
     http.expectNone('/api/empleados');
 
