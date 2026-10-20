@@ -14,6 +14,8 @@ export interface Empleado {
   categoriaLoep: string | null;
   /** Grado de la escala salarial, si el sueldo sigue una escala */
   escalaId: number | null;
+  /** Puesto del orgánico funcional; el régimen que tiene puestos lo exige */
+  puestoId: number | null;
   /** null = lo que diga el régimen (por defecto, se paga cada mes en el rol) */
   pagoDecimoTercero: Modalidad | null;
   pagoDecimoCuarto: Modalidad | null;
@@ -240,4 +242,20 @@ export interface EntradaSimulacion {
   horasSuplementarias?: number;
   horasExtraordinarias?: number;
   comisiones?: number;
+}
+
+/** Un puesto del orgánico funcional con su referencia salarial. */
+export interface Puesto {
+  id: number;
+  nombre: string;
+  /** Puesto del que depende; null en la cabeza del orgánico */
+  superiorId: number | null;
+  funcion: string;
+  responsabilidad: string;
+  /** Sector económico (rama de la comisión sectorial) */
+  sector: string;
+  escalaId: number | null;
+  referencia: Grado | null;
+  /** Cuántos empleados lo ocupan */
+  empleados: number;
 }

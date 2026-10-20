@@ -7,6 +7,7 @@ import type {
   EntradaSimulacion,
   Grado,
   Parametros,
+  Puesto,
   Regimen,
   ResultadoSimulacion,
   TramoIr,
@@ -25,6 +26,9 @@ export interface NovedadEnviada {
 
 /** Lo que se envía al crear o editar un grado de la escala salarial. */
 export type DatosGrado = Omit<Grado, 'id'>;
+
+/** Lo que se envía al crear o editar un puesto del orgánico. */
+export type DatosPuesto = Pick<Puesto, 'nombre' | 'superiorId' | 'funcion' | 'responsabilidad' | 'sector' | 'escalaId'>;
 
 /**
  * Valor de un recurso HTTP, o undefined mientras carga o si falló.
@@ -83,6 +87,16 @@ export class Api {
   }
   eliminarGrado(id: number) {
     return this.http.delete<void>(`/api/escala/${id}`);
+  }
+
+  crearPuesto(datos: DatosPuesto) {
+    return this.http.post<Puesto>('/api/puestos', datos);
+  }
+  editarPuesto(id: number, datos: DatosPuesto) {
+    return this.http.put<Puesto>(`/api/puestos/${id}`, datos);
+  }
+  eliminarPuesto(id: number) {
+    return this.http.delete<void>(`/api/puestos/${id}`);
   }
 
   simular(entrada: EntradaSimulacion) {
