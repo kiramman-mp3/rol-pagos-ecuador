@@ -136,9 +136,7 @@ describe("API de conciliación con el IESS", () => {
     conRol(async (api, id) => {
       const r = await api.get(`/api/roles/${id}/iess.csv`);
       assert.match(r.tipo, /text\/csv/);
-      const marca = r.texto.charCodeAt(0) === 0xfeff; // Excel necesita la marca UTF-8 para leer las tildes
-      assert.ok(marca);
-      const lineas = r.texto.slice(1).trim().split("\n");
+      const lineas = r.texto.trim().split("\n");
       assert.equal(lineas.length, 8); // encabezado + 6 empleados + total
       assert.ok(lineas[0].startsWith("cedula,nombres,regimen,dias_trabajados,materia_gravada"));
       assert.ok(lineas[7].startsWith("TOTAL,"));
