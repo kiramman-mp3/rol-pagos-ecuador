@@ -8,12 +8,34 @@ export interface Empleado {
   sueldoBase: number;
   fechaIngreso: string;
   tipoContrato: string;
+  /** Código del régimen: CODIGO_TRABAJO, LOSEP o LOEP */
+  regimen: string;
+  /** Solo para LOEP: 'servidor' u 'obrero' */
+  categoriaLoep: string | null;
+  /** Grado de la escala salarial, si el sueldo sigue una escala */
+  escalaId: number | null;
+  /** null = lo que diga el régimen (por defecto, se paga cada mes en el rol) */
+  pagoDecimoTercero: Modalidad | null;
+  pagoDecimoCuarto: Modalidad | null;
+  pagoFondosReserva: Modalidad | null;
+  /** null = lo que diga el régimen */
+  recibeHorasExtras: boolean | null;
   activo: boolean;
   /** Solo viene al crear o editar: avisos que no bloquean el guardado. */
   avisos?: string[];
 }
 
 export type DatosEmpleado = Omit<Empleado, 'id' | 'activo' | 'avisos'>;
+
+/** Un grado de la escala salarial con su remuneración mensual unificada. */
+export interface Grado {
+  id: number;
+  regimen: string;
+  grado: number;
+  denominacion: string;
+  rmu: number;
+  fuente: string;
+}
 
 export interface TramoIr {
   desde: number;
@@ -22,8 +44,48 @@ export interface TramoIr {
   porcentaje: number;
 }
 
+/** Cómo se recibe un beneficio: no, dentro del rol cada mes, o acumulado (provisión). */
+export type Modalidad = 'no' | 'mensual' | 'acumulado';
+
+/** Reglas de un régimen laboral. Los porcentajes son fracciones (0.0945 = 9.45%). */
+export interface Regimen {
+  codigo: string;
+  nombre: string;
+  descripcion: string;
+  baseLegal: string;
+  /** 'mixto' remite a otros regímenes según la categoría (la LOEP) */
+  tipo: 'reglas' | 'mixto';
+  regimenServidor: string | null;
+  regimenObrero: string | null;
+  iessPersonal: number | null;
+  iessPatronal: number | null;
+  recargoSuplementarias: number | null;
+  recargoExtraordinarias: number | null;
+  recargoDescanso: number | null;
+  recargoNocturno: number | null;
+  topeSuplementariasMes: number | null;
+  topeExtraordinariasMes: number | null;
+  diasVacaciones: number | null;
+  fondosReserva: number | null;
+  mesesParaFondos: number | null;
+  aplicaDecimoTercero: boolean;
+  aplicaDecimoCuarto: boolean;
+  aplicaFondosReserva: boolean;
+  aplicaHorasExtras: boolean;
+  /** false = hay algo por confirmar (ver notas) */
+  verificado: boolean;
+  notas: string;
+}
+
 export interface Parametros {
+  /** Año cuyos valores se muestran (si el pedido no tiene, el más reciente anterior) */
   anio: number;
+  anioSolicitado: number;
+  /** false = no hay parámetros del año pedido y se usaron los de `anio` */
+  exacto: boolean;
+  /** Años que tienen parámetros guardados, del más reciente al más antiguo */
+  anios: number[];
+  fuente: string;
   sbu: number;
   iessPersonal: number;
   iessPatronal: number;
@@ -33,6 +95,15 @@ export interface Parametros {
   empresa: { nombre: string; ruc: string };
   meses: string[];
   contratos: string[];
+  regimenes: Regimen[];
+  categoriasLoep: string[];
+}
+
+/** La simulación agrega el régimen con que se calculó. */
+export interface ResultadoSimulacion extends ResultadoRol {
+  regimenAplicado: string;
+  tasaIessPersonal: number;
+  tasaIessPatronal: number;
 }
 
 /** Cálculo de un rol; lo comparten la simulación y cada fila del detalle. */
@@ -41,13 +112,19 @@ export interface ResultadoRol {
   mesesServicio: number;
   valorHora: number;
   sueldo: number;
-  horas50: number;
-  horas100: number;
+  horasSuplementarias: number;
+  horasExtraordinarias: number;
+  horasDescanso: number;
   horasNocturnas: number;
-  valorHoras50: number;
-  valorHoras100: number;
+  valorHorasSuplementarias: number;
+  valorHorasExtraordinarias: number;
+  valorHorasDescanso: number;
   valorRecargoNocturno: number;
   comisiones: number;
+  /** Base del IESS y del impuesto: sueldo, horas extras y comisiones */
+  ingresosAportables: number;
+  /** Décimos y fondos de reserva pagados dentro del rol */
+  beneficiosMensuales: number;
   totalIngresos: number;
   aporteIess: number;
   baseIrAnual: number;
@@ -57,9 +134,12 @@ export interface ResultadoRol {
   totalDescuentos: number;
   netoPagar: number;
   decimoTercero: number;
+  decimoTerceroModalidad: Modalidad;
   decimoCuarto: number;
-  vacaciones: number;
+  decimoCuartoModalidad: Modalidad;
   fondosReserva: number;
+  fondosReservaModalidad: Modalidad;
+  vacaciones: number;
   aportePatronal: number;
   totalProvisiones: number;
   costoEmpleador: number;
@@ -73,6 +153,10 @@ export interface RolDetalle extends ResultadoRol {
   cargo: string;
   sueldoBase: number;
   fechaIngreso: string;
+  regimen: string;
+  regimenAplicado: string;
+  tasaIessPersonal: number;
+  tasaIessPatronal: number;
 }
 
 export interface RolCabecera {
@@ -88,13 +172,37 @@ export interface RolCabecera {
   totalCosto: number;
 }
 
+/** Aportes de un empleado en un rol, para contrastarlos con el comprobante del IESS. */
+export interface FilaIess {
+  cedula: string;
+  nombres: string;
+  regimenAplicado: string;
+  diasTrabajados: number;
+  materiaGravada: number;
+  tasaPersonal: number;
+  aportePersonal: number;
+  tasaPatronal: number;
+  aportePatronal: number;
+  totalAportes: number;
+  fondosADepositar: number;
+  fondosPagadosEnRol: number;
+}
+
+export interface PlanillaIess {
+  anio: number;
+  mes: number;
+  filas: FilaIess[];
+  totales: Omit<FilaIess, 'cedula' | 'nombres' | 'regimenAplicado' | 'diasTrabajados' | 'tasaPersonal' | 'tasaPatronal'>;
+}
+
 export interface RolCompleto extends RolCabecera {
   detalle: RolDetalle[];
 }
 
 export interface Novedades {
-  horas50: number;
-  horas100: number;
+  horasSuplementarias: number;
+  horasExtraordinarias: number;
+  horasDescanso: number;
   horasNocturnas: number;
   comisiones: number;
   otrosDescuentos: number;
@@ -105,6 +213,10 @@ export interface EmpleadoDelPeriodo {
   nombres: string;
   cargo: string;
   sueldoBase: number;
+  regimen: string;
+  regimenAplicado: string;
+  /** false = sus horas suplementarias, extraordinarias y de descanso no se pagan */
+  recibeHorasExtras: boolean;
   novedades: Novedades;
 }
 
@@ -117,7 +229,11 @@ export interface Periodo {
 
 export interface EntradaSimulacion {
   sueldo: number;
-  horas50?: number;
-  horas100?: number;
+  regimen?: string;
+  categoriaLoep?: string;
+  /** Modalidad de los décimos y fondos de reserva; sin ella, la del régimen */
+  decimos?: Modalidad;
+  horasSuplementarias?: number;
+  horasExtraordinarias?: number;
   comisiones?: number;
 }

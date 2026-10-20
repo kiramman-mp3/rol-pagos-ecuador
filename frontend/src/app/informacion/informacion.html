@@ -1,0 +1,186 @@
+<header class="barra">
+  <div class="barra-interior">
+    <a class="marca" routerLink="/" aria-label="Rol de pagos, página de inicio">
+      Rol de pagos<small>Ecuador 2026</small>
+    </a>
+    <nav class="enlaces" aria-label="Secciones de la página">
+      <a routerLink="/informacion" fragment="acerca">Acerca de</a>
+      <a routerLink="/informacion" fragment="investigacion">Investigación</a>
+      <a routerLink="/informacion" fragment="fuentes">Fuentes</a>
+    </nav>
+    <a class="boton boton-pequeno entrar" routerLink="/sistema">Ingresar al sistema</a>
+  </div>
+</header>
+
+<main>
+  <section class="cabecera">
+    <p class="sobretitulo">Información del proyecto</p>
+    <h1>De qué trata este sistema y de dónde salen sus reglas</h1>
+    <p class="entrada-texto">
+      Un rol de pagos para Ecuador cuyas reglas de ley se pueden cambiar sin tocar el código. Esta página resume qué
+      resuelve, qué encontró la investigación y deja los enlaces de cada fuente consultada.
+    </p>
+  </section>
+
+  <section class="seccion" id="acerca" aria-labelledby="titulo-acerca">
+    <h2 id="titulo-acerca">Acerca de</h2>
+    <div class="dos-columnas">
+      <div>
+        <p>
+          «Rol de pagos Ecuador» es un sistema de nómina hecho como práctica de la guía APE, donde se explica cómo
+          elaborar un rol de pagos parametrizable. Calcula el ingreso, los descuentos, el neto y el costo total para
+          la empresa, y genera una boleta por trabajador.
+        </p>
+        <p>
+          La guía pide poder escoger el régimen laboral (Código del Trabajo, LOSEP o LOEP), el salario básico, la
+          escala salarial y si el trabajador recibe décimo tercero, décimo cuarto y horas extras, además de ver si el
+          IESS, que se hace a mano en Excel, se puede automatizar. La tabla de abajo muestra cómo cumple cada punto.
+        </p>
+      </div>
+      <dl class="datos-proyecto">
+        <div><dt>Hecho con</dt><dd>Express 5 y TypeScript en el servidor, SQLite como base y Angular 22 en la pantalla</dd></div>
+        <div><dt>Dinero</dt><dd>Se calcula con decimales exactos y se redondea a centavos en cada rubro</dd></div>
+        <div><dt>Datos</dt><dd>Una base local; incluye seis empleados de ejemplo que cubren los tres regímenes</dd></div>
+        <div><dt>Alcance</dt><dd>Demostrativo: sin usuarios, sin gastos deducibles del impuesto, sin préstamos del IESS ni liquidaciones</dd></div>
+      </dl>
+    </div>
+
+    <h3 class="subtitulo-seccion">Lo que pide la guía y cómo se cumple</h3>
+    <div class="hoja">
+      <div class="deslizable">
+        <table class="tabla">
+          <caption class="solo-lectura">Requisitos de la guía y cómo los cumple el sistema</caption>
+          <thead>
+            <tr><th>La guía pide</th><th>Cómo lo hace el sistema</th><th>Dónde</th></tr>
+          </thead>
+          <tbody>
+            @for (r of requisitos; track r.pedido) {
+              <tr>
+                <th scope="row">{{ r.pedido }}</th>
+                <td>{{ r.como }}</td>
+                <td>{{ r.donde }}</td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <p class="aviso-legal">
+      Las cifras son una referencia para aprender. Verifícalas con la norma y con el IESS antes de usar el sistema en
+      una nómina real.
+    </p>
+  </section>
+
+  <section class="seccion" id="investigacion" aria-labelledby="titulo-investigacion">
+    <h2 id="titulo-investigacion">Lo que encontró la investigación</h2>
+    <p class="subtitulo">
+      Se leyó el texto de la LOSEP, del Código del Trabajo y de la LOEP, y se contrastó con la página del IESS y con
+      fuentes secundarias.
+    </p>
+
+    <h3 class="subtitulo-seccion">Los hallazgos principales</h3>
+    <ul class="hallazgos">
+      <li>
+        <strong>Los décimos se pagan cada mes por defecto.</strong>
+        El Código del Trabajo (arts. 111 y 113) y la LOSEP (arts. 97 y 98) dicen que se pagan mensualmente y que se
+        acumulan solo si el trabajador lo pide por escrito. Por eso cada empleado tiene tres opciones: no lo recibe,
+        se paga en el rol o lo acumula.
+      </li>
+      <li>
+        <strong>Los décimos no pagan IESS ni impuesto a la renta.</strong>
+        Los arts. 112 y 114 del Código del Trabajo los excluyen del aporte al IESS, del fondo de reserva, de las
+        vacaciones y del impuesto a la renta. Por eso lo pagado en el rol sube el neto, pero no la base de esos
+        cálculos.
+      </li>
+      <li>
+        <strong>Los recargos de horas extras cambian según el régimen.</strong>
+        El Código del Trabajo usa +50 % y +100 %; la LOSEP, +25 %, +60 % y +100 %, con tope de 60 horas al mes. Las
+        horas se registran por tipo y cada régimen define su recargo.
+      </li>
+      <li>
+        <strong>La LOEP no tiene tasas propias.</strong>
+        Sus servidores de carrera se rigen por la ley de administración pública y sus obreros por el Código del
+        Trabajo (arts. 17 a 19). Por eso, en la LOEP, el empleado elige su categoría.
+      </li>
+      <li>
+        <strong>El IESS no recibe un archivo de aportes.</strong>
+        El portal arma la planilla con los avisos y novedades que declara el empleador, y el comprobante se puede
+        descargar en Excel. Se automatiza el cálculo y la conciliación, no la carga.
+      </li>
+    </ul>
+
+    <h3 class="subtitulo-seccion">Las reglas de cada régimen</h3>
+    <div class="hoja">
+      <div class="deslizable">
+        <table class="tabla">
+          <caption class="solo-lectura">Reglas del Código del Trabajo y de la LOSEP que carga el sistema</caption>
+          <thead>
+            <tr><th>Tema</th><th>Código del Trabajo</th><th>LOSEP</th></tr>
+          </thead>
+          <tbody>
+            @for (r of reglas; track r.tema) {
+              <tr>
+                <th scope="row">{{ r.tema }}</th>
+                <td>{{ r.codigo }}</td>
+                <td>{{ r.losep }}</td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+    </div>
+    <p class="pequeno apoyo">
+      Son los valores iniciales del sistema. Se pueden cambiar en Parámetros, y los roles ya generados conservan los
+      valores con que se calcularon.
+    </p>
+
+    <h3 class="subtitulo-seccion">Lo que queda por confirmar</h3>
+    <div class="por-confirmar">
+      @for (p of porConfirmar; track p.dato) {
+        <article class="tarjeta">
+          <h4>{{ p.dato }}</h4>
+          <p>{{ p.motivo }}</p>
+          <p class="que"><strong>Qué hace el sistema:</strong> {{ p.que }}</p>
+        </article>
+      }
+    </div>
+  </section>
+
+  <section class="seccion" id="fuentes" aria-labelledby="titulo-fuentes">
+    <h2 id="titulo-fuentes">Fuentes consultadas</h2>
+    <p class="subtitulo">
+      {{ totalFuentes }} enlaces, agrupados por tema. Las {{ totalLeidas }} marcadas como «leída» se abrieron y se
+      leyeron; de las demás solo se tomó el dato que indica cada una, a partir de los resultados de una búsqueda.
+    </p>
+
+    @for (g of grupos; track g.id) {
+      <section class="grupo-fuentes" [attr.aria-labelledby]="'grupo-' + g.id">
+        <h3 [id]="'grupo-' + g.id">{{ g.titulo }}</h3>
+        <p class="apoyo">{{ g.descripcion }}</p>
+        <ul class="lista-fuentes">
+          @for (f of g.fuentes; track f.url) {
+            <li>
+              <a [href]="f.url" target="_blank" rel="noopener noreferrer">{{ f.titulo }}<span class="solo-lectura"> (se abre en otra pestaña)</span></a>
+              @if (f.leida) { <span class="etiqueta-leida">Leída</span> }
+              <span class="uso">{{ f.uso }}</span>
+            </li>
+          }
+        </ul>
+      </section>
+    }
+  </section>
+
+  <section class="cierre" aria-labelledby="titulo-cierre">
+    <h2 id="titulo-cierre">Pruébalo con los datos de ejemplo</h2>
+    <p>Entra al sistema, carga los empleados de ejemplo con un clic y genera el rol del mes.</p>
+    <a class="boton boton-grande" routerLink="/sistema">Ingresar al sistema</a>
+  </section>
+</main>
+
+<footer class="pie">
+  <p>
+    Rol de pagos Ecuador es un proyecto demostrativo.
+    <a routerLink="/">Volver a la página de inicio</a>.
+  </p>
+</footer>

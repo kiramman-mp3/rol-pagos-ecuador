@@ -7,6 +7,11 @@ export const routes: Routes = [
     loadComponent: () => import('./landing/landing').then((m) => m.Landing),
   },
   {
+    path: 'informacion',
+    title: 'Información | Rol de pagos Ecuador',
+    loadComponent: () => import('./informacion/informacion').then((m) => m.Informacion),
+  },
+  {
     path: 'sistema',
     loadComponent: () => import('./sistema/shell').then((m) => m.Shell),
     children: [
@@ -27,6 +32,11 @@ export const routes: Routes = [
         title: 'Editar empleado | Rol de pagos',
         loadComponent: () =>
           import('./sistema/empleados/formulario').then((m) => m.FormularioEmpleado),
+      },
+      {
+        path: 'parametros',
+        title: 'Parámetros | Rol de pagos',
+        loadComponent: () => import('./sistema/parametros/parametros').then((m) => m.PaginaParametros),
       },
       {
         path: 'roles',

@@ -1,4 +1,5 @@
 import { httpResource } from '@angular/common/http';
+import { PercentPipe } from '@angular/common';
 import { Component, computed, inject, input } from '@angular/core';
 import { Router, RouterLink } from '@angular/router';
 import { firstValueFrom } from 'rxjs';
@@ -6,11 +7,12 @@ import { firstValueFrom } from 'rxjs';
 import { Api, ParametrosLey, valorSeguro } from '../../core/api';
 import { Avisos } from '../../core/avisos';
 import { DineroPipe, sumar } from '../../core/dinero.pipe';
-import type { RolCompleto, RolDetalle } from '../../core/modelos';
+import { etiquetaRegimen } from '../../core/regimen';
+import type { Modalidad, PlanillaIess, RolCompleto, RolDetalle } from '../../core/modelos';
 
 @Component({
   selector: 'app-detalle-rol',
-  imports: [RouterLink, DineroPipe],
+  imports: [RouterLink, DineroPipe, PercentPipe],
   template: `
     @if (datos(); as r) {
       <div class="encabezado">
@@ -24,6 +26,7 @@ import type { RolCompleto, RolDetalle } from '../../core/modelos';
         <div class="acciones no-imprimir">
           <a class="boton boton-claro" [routerLink]="['/sistema/roles/novedades', r.anio, r.mes]">Recalcular</a>
           <a class="boton boton-claro" [href]="'/api/roles/' + r.id + '/csv'" download>Descargar CSV</a>
+          <a class="boton boton-claro" [href]="'/api/roles/' + r.id + '/iess.csv'" download>Aportes para el IESS</a>
           <button class="boton boton-claro" type="button" (click)="imprimir()">Imprimir</button>
           <button class="boton-texto boton-peligro" type="button" (click)="eliminar(r)">Eliminar rol</button>
         </div>
@@ -74,7 +77,7 @@ import type { RolCompleto, RolDetalle } from '../../core/modelos';
             <thead>
               <tr>
                 <th rowspan="2">Empleado</th>
-                <th colspan="4" class="g-ingresos t-ingresos corte">Ingresos</th>
+                <th colspan="5" class="g-ingresos t-ingresos corte">Ingresos</th>
                 <th colspan="4" class="g-descuentos t-descuentos corte">Descuentos</th>
                 <th rowspan="2" class="num g-neto c-neto corte">Neto a recibir</th>
               </tr>
@@ -82,8 +85,9 @@ import type { RolCompleto, RolDetalle } from '../../core/modelos';
                 <th class="num corte">Sueldo</th>
                 <th class="num">Horas extra</th>
                 <th class="num">Comisiones</th>
+                <th class="num" title="Décimos y fondos de reserva que se pagan dentro del rol">Décimos y fondos</th>
                 <th class="num">Total</th>
-                <th class="num corte">IESS 9.45%</th>
+                <th class="num corte">Aporte IESS</th>
                 <th class="num">Impuesto a la renta</th>
                 <th class="num">Otros</th>
                 <th class="num">Total</th>
@@ -97,12 +101,17 @@ import type { RolCompleto, RolDetalle } from '../../core/modelos';
                     <span class="secundario">
                       {{ d.cargo }}@if (d.diasTrabajados < 30) {, {{ d.diasTrabajados }} días trabajados}
                     </span>
+                    <span class="secundario">{{ regimen(d) }}</span>
                   </td>
                   <td class="num corte">{{ d.sueldo | dinero }}</td>
                   <td class="num">{{ horasExtra(d) | dinero }}</td>
                   <td class="num">{{ d.comisiones | dinero }}</td>
+                  <td class="num">{{ d.beneficiosMensuales | dinero }}</td>
                   <td class="num"><strong>{{ d.totalIngresos | dinero }}</strong></td>
-                  <td class="num corte">{{ d.aporteIess | dinero }}</td>
+                  <td class="num corte">
+                    {{ d.aporteIess | dinero }}
+                    <span class="secundario">{{ d.tasaIessPersonal | percent: '1.2-2' }}</span>
+                  </td>
                   <td class="num">{{ d.impuestoRenta | dinero }}</td>
                   <td class="num">{{ d.otrosDescuentos | dinero }}</td>
                   <td class="num"><strong>{{ d.totalDescuentos | dinero }}</strong></td>
@@ -116,6 +125,7 @@ import type { RolCompleto, RolDetalle } from '../../core/modelos';
                 <td class="num corte">{{ totales().sueldo | dinero }}</td>
                 <td class="num">{{ totales().horasExtra | dinero }}</td>
                 <td class="num">{{ totales().comisiones | dinero }}</td>
+                <td class="num">{{ totales().beneficios | dinero }}</td>
                 <td class="num">{{ r.totalIngresos | dinero }}</td>
                 <td class="num corte">{{ totales().iess | dinero }}</td>
                 <td class="num">{{ totales().impuesto | dinero }}</td>
@@ -131,7 +141,10 @@ import type { RolCompleto, RolDetalle } from '../../core/modelos';
       <section class="hoja hoja-provision" aria-labelledby="titulo-provisiones">
         <div class="hoja-titulo">
           <h2 id="titulo-provisiones">Costo empleador y provisiones</h2>
-          <p>Lo paga la empresa aparte del neto. No se descuenta al trabajador.</p>
+          <p>
+            Lo paga la empresa aparte del neto. Los décimos y fondos que se pagan en el rol ya están en los
+            ingresos; aquí solo aparecen los que el trabajador acumula.
+          </p>
         </div>
         <div class="deslizable">
           <table class="tabla planilla">
@@ -142,7 +155,7 @@ import type { RolCompleto, RolDetalle } from '../../core/modelos';
                 <th class="num g-provision">Décimo cuarto</th>
                 <th class="num g-provision">Vacaciones</th>
                 <th class="num g-provision">Fondos de reserva</th>
-                <th class="num g-provision">Aporte patronal 11.15%</th>
+                <th class="num g-provision">Aporte patronal</th>
                 <th class="num g-provision">Total provisiones</th>
                 <th class="num">Costo empleador</th>
               </tr>
@@ -151,17 +164,30 @@ import type { RolCompleto, RolDetalle } from '../../core/modelos';
               @for (d of r.detalle; track d.id) {
                 <tr>
                   <td>{{ d.nombres }}</td>
-                  <td class="num">{{ d.decimoTercero | dinero }}</td>
-                  <td class="num">{{ d.decimoCuarto | dinero }}</td>
+                  <td class="num">
+                    @if (d.decimoTerceroModalidad === 'acumulado') { {{ d.decimoTercero | dinero }} }
+                    @else { <span class="apoyo">{{ pagado(d.decimoTerceroModalidad) }}</span> }
+                  </td>
+                  <td class="num">
+                    @if (d.decimoCuartoModalidad === 'acumulado') { {{ d.decimoCuarto | dinero }} }
+                    @else { <span class="apoyo">{{ pagado(d.decimoCuartoModalidad) }}</span> }
+                  </td>
                   <td class="num">{{ d.vacaciones | dinero }}</td>
                   <td class="num">
-                    @if (d.fondosReserva) {
+                    @if (d.fondosReservaModalidad === 'no') {
+                      <span class="apoyo">No recibe</span>
+                    } @else if (!d.fondosReserva) {
+                      <span class="apoyo" title="Se generan desde el mes 13 de trabajo">Aún no aplica</span>
+                    } @else if (d.fondosReservaModalidad === 'acumulado') {
                       {{ d.fondosReserva | dinero }}
                     } @else {
-                      <span class="apoyo" title="Se generan desde el mes 13 de trabajo">Aún no aplica</span>
+                      <span class="apoyo">{{ pagado(d.fondosReservaModalidad) }}</span>
                     }
                   </td>
-                  <td class="num">{{ d.aportePatronal | dinero }}</td>
+                  <td class="num">
+                    {{ d.aportePatronal | dinero }}
+                    <span class="secundario">{{ d.tasaIessPatronal | percent: '1.2-2' }}</span>
+                  </td>
                   <td class="num"><strong>{{ d.totalProvisiones | dinero }}</strong></td>
                   <td class="num"><strong>{{ d.costoEmpleador | dinero }}</strong></td>
                 </tr>
@@ -183,10 +209,73 @@ import type { RolCompleto, RolDetalle } from '../../core/modelos';
         </div>
         <div class="hoja-cuerpo pequeno apoyo">
           El décimo cuarto se calcula sobre el sueldo básico unificado ({{ parametros()?.sbu | dinero }}), el tercero
-          sobre el total de ingresos, las vacaciones sobre el sueldo (1/24) y los fondos de reserva (8.33%) desde el
-          mes 13. El costo del empleador es el total de ingresos más estas provisiones.
+          sobre los ingresos aportables, las vacaciones sobre esos mismos ingresos según los días del régimen y los
+          fondos de reserva desde el mes 13. El costo del empleador es el total de ingresos más estas provisiones.
         </div>
       </section>
+
+      @if (iess(); as p) {
+        <section class="hoja" aria-labelledby="titulo-iess">
+          <div class="hoja-titulo">
+            <h2 id="titulo-iess">Conciliación con el IESS</h2>
+            <p>
+              El IESS arma la planilla en su portal con tus avisos y novedades; no recibe un archivo. Descarga el
+              comprobante del mes (se puede bajar en Excel) y compara, empleado por empleado, la materia gravada y
+              los aportes de esta tabla.
+            </p>
+          </div>
+          <div class="deslizable">
+            <table class="tabla planilla">
+              <thead>
+                <tr>
+                  <th>Empleado</th>
+                  <th class="num">Materia gravada</th>
+                  <th class="num">Aporte personal</th>
+                  <th class="num">Aporte patronal</th>
+                  <th class="num">Total aportes</th>
+                  <th class="num" title="Fondos de reserva que el trabajador acumula: se depositan en el IESS">Fondos a depositar</th>
+                  <th class="num" title="Fondos de reserva que ya se pagaron en el rol">Fondos pagados en el rol</th>
+                </tr>
+              </thead>
+              <tbody>
+                @for (f of p.filas; track f.cedula) {
+                  <tr>
+                    <td>{{ f.nombres }}<span class="secundario">{{ f.cedula }}</span></td>
+                    <td class="num">{{ f.materiaGravada | dinero }}</td>
+                    <td class="num">
+                      {{ f.aportePersonal | dinero }}
+                      <span class="secundario">{{ f.tasaPersonal | percent: '1.2-2' }}</span>
+                    </td>
+                    <td class="num">
+                      {{ f.aportePatronal | dinero }}
+                      <span class="secundario">{{ f.tasaPatronal | percent: '1.2-2' }}</span>
+                    </td>
+                    <td class="num"><strong>{{ f.totalAportes | dinero }}</strong></td>
+                    <td class="num">{{ f.fondosADepositar | dinero }}</td>
+                    <td class="num">{{ f.fondosPagadosEnRol | dinero }}</td>
+                  </tr>
+                }
+              </tbody>
+              <tfoot>
+                <tr>
+                  <td>Totales</td>
+                  <td class="num">{{ p.totales.materiaGravada | dinero }}</td>
+                  <td class="num">{{ p.totales.aportePersonal | dinero }}</td>
+                  <td class="num">{{ p.totales.aportePatronal | dinero }}</td>
+                  <td class="num">{{ p.totales.totalAportes | dinero }}</td>
+                  <td class="num">{{ p.totales.fondosADepositar | dinero }}</td>
+                  <td class="num">{{ p.totales.fondosPagadosEnRol | dinero }}</td>
+                </tr>
+              </tfoot>
+            </table>
+          </div>
+          <div class="hoja-cuerpo pequeno apoyo">
+            La materia gravada es el sueldo, las horas extras y las comisiones: los décimos y los fondos de reserva
+            pagados en el rol no la integran. Los décimos se declaran aparte, en el sistema de décimos del Ministerio
+            del Trabajo, no en la planilla del IESS.
+          </div>
+        </section>
+      }
     } @else if (rol.error()) {
       <div class="aviso aviso-danger" role="status">
         No se encontró este rol. Puede que se haya eliminado.
@@ -206,6 +295,7 @@ export class DetalleRol {
   protected readonly parametros = inject(ParametrosLey).valor;
   protected readonly rol = httpResource<RolCompleto>(() => `/api/roles/${this.id()}`);
   protected readonly datos = valorSeguro(this.rol);
+  protected readonly iess = valorSeguro(httpResource<PlanillaIess>(() => `/api/roles/${this.id()}/iess`));
 
   protected readonly nombreMes = computed(
     () => this.parametros()?.meses[(this.datos()?.mes ?? 1) - 1] ?? '',
@@ -221,16 +311,29 @@ export class DetalleRol {
       iess: suma((x) => x.aporteIess),
       impuesto: suma((x) => x.impuestoRenta),
       otros: suma((x) => x.otrosDescuentos),
-      decimoTercero: suma((x) => x.decimoTercero),
-      decimoCuarto: suma((x) => x.decimoCuarto),
+      beneficios: suma((x) => x.beneficiosMensuales),
+      // En la tabla de provisiones solo cuenta lo que se acumula.
+      decimoTercero: suma((x) => (x.decimoTerceroModalidad === 'acumulado' ? x.decimoTercero : 0)),
+      decimoCuarto: suma((x) => (x.decimoCuartoModalidad === 'acumulado' ? x.decimoCuarto : 0)),
       vacaciones: suma((x) => x.vacaciones),
-      fondos: suma((x) => x.fondosReserva),
+      fondos: suma((x) => (x.fondosReservaModalidad === 'acumulado' ? x.fondosReserva : 0)),
       patronal: suma((x) => x.aportePatronal),
     };
   });
 
+  /** Qué decir en la tabla de provisiones cuando un beneficio no se provisiona. */
+  protected pagado(modalidad: Modalidad): string {
+    return modalidad === 'mensual' ? 'Pagado en el rol' : 'No recibe';
+  }
+
+  protected regimen(d: RolDetalle): string {
+    return etiquetaRegimen(this.parametros()?.regimenes, d.regimen, d.regimenAplicado);
+  }
+
   protected horasExtra(d: RolDetalle): number {
-    return sumar([d.valorHoras50, d.valorHoras100, d.valorRecargoNocturno]);
+    return sumar([
+      d.valorHorasSuplementarias, d.valorHorasExtraordinarias, d.valorHorasDescanso, d.valorRecargoNocturno,
+    ]);
   }
 
   protected imprimir() {

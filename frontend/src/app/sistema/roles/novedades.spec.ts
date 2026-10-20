@@ -9,10 +9,14 @@ import { NovedadesMes } from './novedades';
 @Component({ template: '' })
 class Vacio {}
 
-const SIN_NOVEDADES = { horas50: 0, horas100: 0, horasNocturnas: 0, comisiones: 0, otrosDescuentos: 0 };
+const SIN_NOVEDADES = { horasSuplementarias: 0, horasExtraordinarias: 0, horasDescanso: 0, horasNocturnas: 0, comisiones: 0, otrosDescuentos: 0 };
 const PERIODO = {
   anio: 2026, mes: 10, existe: true,
-  empleados: [{ id: 1, nombres: 'Ana Prueba', cargo: 'Analista', sueldoBase: 1000, novedades: SIN_NOVEDADES }],
+  empleados: [{
+    id: 1, nombres: 'Ana Prueba', cargo: 'Analista', sueldoBase: 1000,
+    regimen: 'CODIGO_TRABAJO', regimenAplicado: 'CODIGO_TRABAJO', recibeHorasExtras: true,
+    novedades: SIN_NOVEDADES,
+  }],
 };
 
 describe('NovedadesMes', () => {
@@ -36,7 +40,7 @@ describe('NovedadesMes', () => {
     fixture.detectChanges();
     TestBed.tick();
 
-    http.expectOne('/api/parametros').flush({ meses: ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'] });
+    http.expectOne('/api/parametros').flush({ regimenes: [], meses: ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'] });
     http.expectOne('/api/roles/periodo/2026/10').flush(PERIODO);
     await fixture.whenStable();
     fixture.detectChanges();
@@ -54,12 +58,37 @@ describe('NovedadesMes', () => {
     const envio = http.expectOne('/api/roles/generar');
     expect(envio.request.body).toEqual({
       anio: 2026, mes: 10,
-      novedades: [{ empleadoId: 1, horas50: '', horas100: '', horasNocturnas: '', comisiones: '200', otrosDescuentos: '' }],
+      novedades: [{ empleadoId: 1, horasSuplementarias: '', horasExtraordinarias: '', horasDescanso: '', horasNocturnas: '', comisiones: '200', otrosDescuentos: '' }],
     });
     envio.flush({ id: 7, empleados: 1 });
     await new Promise((resolver) => setTimeout(resolver));
 
     expect(TestBed.inject(Router).url).toBe('/sistema/roles/7');
+  });
+
+  it('deshabilita las horas extras de quien no las recibe, pero no el recargo nocturno', async () => {
+    const fixture = TestBed.createComponent(NovedadesMes);
+    fixture.componentRef.setInput('anio', '2026');
+    fixture.componentRef.setInput('mes', '10');
+    fixture.detectChanges();
+    TestBed.tick();
+    http.expectOne('/api/parametros').flush({ regimenes: [], meses: [] });
+    http.expectOne('/api/roles/periodo/2026/10').flush({
+      ...PERIODO,
+      existe: false,
+      empleados: [{ ...PERIODO.empleados[0], recibeHorasExtras: false }],
+    });
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    const el = fixture.nativeElement as HTMLElement;
+    const entrada = (etiqueta: string) =>
+      el.querySelector<HTMLInputElement>(`input[aria-label="${etiqueta} de Ana Prueba"]`)!;
+    expect(entrada('Horas suplementarias').disabled).toBe(true);
+    expect(entrada('Horas extraordinarias').disabled).toBe(true);
+    expect(entrada('Horas en sábado, domingo o feriado').disabled).toBe(true);
+    expect(entrada('Horas nocturnas').disabled).toBe(false);
+    expect(entrada('Comisiones y bonos').disabled).toBe(false);
   });
 
   it('si el servidor rechaza una novedad, no navega y muestra el motivo', async () => {
@@ -68,7 +97,7 @@ describe('NovedadesMes', () => {
     fixture.componentRef.setInput('mes', '10');
     fixture.detectChanges();
     TestBed.tick();
-    http.expectOne('/api/parametros').flush({ meses: [] });
+    http.expectOne('/api/parametros').flush({ regimenes: [], meses: [] });
     http.expectOne('/api/roles/periodo/2026/10').flush({ ...PERIODO, existe: false });
     await fixture.whenStable();
     fixture.detectChanges();

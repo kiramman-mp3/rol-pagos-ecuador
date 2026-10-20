@@ -61,6 +61,8 @@ a:hover { color: var(--tinta); }
 
 .apoyo { color: var(--tinta-suave); }
 .pequeno { font-size: .875rem; }
+.sin-vinetas { list-style: none; padding: 0; margin: 0 0 .75rem; }
+.sin-vinetas li { margin: .3rem 0; }
 .num { text-align: right; white-space: nowrap; }
 .solo-lectura { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
 
@@ -176,6 +178,29 @@ th.c-neto { background: var(--neto-fondo); }
 .campo .ayuda { font-size: .82rem; color: var(--tinta-suave); }
 .campo.c2 { grid-column: span 2; } .campo.c3 { grid-column: span 3; } .campo.c4 { grid-column: span 4; }
 .formulario .acciones { grid-column: 1 / -1; margin-top: .5rem; }
+.beneficios { border: 1px solid var(--linea); border-radius: var(--radio); padding: 1rem; margin: 0; min-width: 0; }
+.beneficios legend { font-weight: 600; padding: 0 .4rem; }
+.rejilla-beneficios { display: grid; grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr)); gap: 1rem; }
+.rejilla-beneficios .campo { grid-column: auto; }
+.casilla { display: flex; align-items: center; gap: .5rem; font-weight: 500; cursor: pointer; }
+.casilla input { width: 1.1rem; height: 1.1rem; accent-color: var(--marca); }
+textarea.entrada { resize: vertical; font: inherit; }
+
+/* ---- Pestañas ---- */
+.pestanas { display: flex; gap: .25rem; flex-wrap: wrap; border-bottom: 1px solid var(--linea); margin-bottom: 1.25rem; }
+.pestana {
+  font: 600 .95rem var(--cuerpo); color: var(--tinta-suave); background: none; border: 0;
+  border-bottom: 3px solid transparent; padding: .7rem 1rem; cursor: pointer; margin-bottom: -1px;
+}
+.pestana:hover { color: var(--tinta); }
+.pestana.activa { color: var(--tinta); border-bottom-color: var(--marca); }
+
+/* ---- Regímenes: cada uno se abre y se cierra ---- */
+details.regimen > summary {
+  display: flex; align-items: center; gap: 1rem; flex-wrap: wrap; padding: 1rem 1.25rem; cursor: pointer; list-style: none;
+}
+details.regimen > summary::-webkit-details-marker { display: none; }
+details.regimen[open] > summary { border-bottom: 1px solid var(--linea-suave); }
 .entrada {
   font: 400 1rem var(--cuerpo); font-variant-numeric: tabular-nums;
   color: var(--tinta); background: #fff; width: 100%;

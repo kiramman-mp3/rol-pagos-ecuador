@@ -6,7 +6,9 @@ import type { ErrorRequestHandler } from "express";
 
 import { abrirBase } from "./db.ts";
 import { rutasEmpleados } from "./rutas/empleados.ts";
+import { rutasEscala } from "./rutas/escala.ts";
 import { rutasParametros } from "./rutas/parametros.ts";
+import { rutasRegimenes } from "./rutas/regimenes.ts";
 import { rutasRoles } from "./rutas/roles.ts";
 import { ErrorApi } from "./validaciones.ts";
 
@@ -25,7 +27,9 @@ export function crearApp({ rutaBase, carpetaFrontend }: Opciones) {
 
   app.use("/api/empleados", rutasEmpleados(db));
   app.use("/api/roles", rutasRoles(db));
-  app.use("/api", rutasParametros());
+  app.use("/api/regimenes", rutasRegimenes(db));
+  app.use("/api/escala", rutasEscala(db));
+  app.use("/api", rutasParametros(db));
   app.use("/api", (_req, _res, next) => next(new ErrorApi(404, ["Ruta no encontrada."])));
 
   // En producción, Express también entrega la aplicación Angular.

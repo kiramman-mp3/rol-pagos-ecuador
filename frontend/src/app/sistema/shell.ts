@@ -17,8 +17,12 @@ import { ParametrosLey } from '../core/api';
         <nav class="navegacion" aria-label="Principal">
           <a routerLink="/sistema/empleados" routerLinkActive ariaCurrentWhenActive="page">Empleados</a>
           <a routerLink="/sistema/roles" routerLinkActive ariaCurrentWhenActive="page">Roles de pago</a>
+          <a routerLink="/sistema/parametros" routerLinkActive ariaCurrentWhenActive="page">Parámetros</a>
         </nav>
-        <span class="empresa">{{ parametros()?.empresa?.nombre }}</span>
+        <span class="empresa">
+          {{ parametros()?.empresa?.nombre }}
+          · <a routerLink="/informacion">Información</a>
+        </span>
       </div>
     </header>
 

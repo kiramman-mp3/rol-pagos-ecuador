@@ -1,4 +1,5 @@
 import { httpResource } from '@angular/common/http';
+import { PercentPipe } from '@angular/common';
 import { Component, computed, effect, inject, input, signal } from '@angular/core';
 import { Router, RouterLink } from '@angular/router';
 import { firstValueFrom } from 'rxjs';
@@ -8,6 +9,7 @@ import type { NovedadEnviada } from '../../core/api';
 import { Avisos } from '../../core/avisos';
 import { DineroPipe } from '../../core/dinero.pipe';
 import type { Periodo } from '../../core/modelos';
+import { etiquetaRegimen } from '../../core/regimen';
 
 type Campo = Exclude<keyof NovedadEnviada, 'empleadoId'>;
 
@@ -15,11 +17,16 @@ interface Fila extends NovedadEnviada {
   nombres: string;
   cargo: string;
   sueldoBase: number;
+  regimen: string;
+  regimenAplicado: string;
+  /** false = no cobra horas suplementarias, extraordinarias ni de descanso */
+  recibeHorasExtras: boolean;
 }
 
-const COLUMNAS: { campo: Campo; etiqueta: string; corte?: boolean }[] = [
-  { campo: 'horas50', etiqueta: 'Horas suplementarias', corte: true },
-  { campo: 'horas100', etiqueta: 'Horas extraordinarias' },
+const COLUMNAS: { campo: Campo; etiqueta: string; corte?: boolean; extra?: boolean }[] = [
+  { campo: 'horasSuplementarias', etiqueta: 'Horas suplementarias', corte: true, extra: true },
+  { campo: 'horasExtraordinarias', etiqueta: 'Horas extraordinarias', extra: true },
+  { campo: 'horasDescanso', etiqueta: 'Horas en sábado, domingo o feriado', extra: true },
   { campo: 'horasNocturnas', etiqueta: 'Horas nocturnas' },
   { campo: 'comisiones', etiqueta: 'Comisiones y bonos' },
   { campo: 'otrosDescuentos', etiqueta: 'Anticipos y otros descuentos', corte: true },
@@ -28,7 +35,7 @@ const COLUMNAS: { campo: Campo; etiqueta: string; corte?: boolean }[] = [
 /** Grilla para digitar horas extras, comisiones y anticipos antes de generar el rol. */
 @Component({
   selector: 'app-novedades-mes',
-  imports: [RouterLink, DineroPipe],
+  imports: [RouterLink, DineroPipe, PercentPipe],
   template: `
     <div class="encabezado">
       <div>
@@ -60,13 +67,14 @@ const COLUMNAS: { campo: Campo; etiqueta: string; corte?: boolean }[] = [
                   <tr>
                     <th rowspan="2">Empleado</th>
                     <th rowspan="2" class="num">Sueldo base</th>
-                    <th colspan="4" class="g-ingresos t-ingresos corte">Suma al ingreso</th>
+                    <th colspan="5" class="g-ingresos t-ingresos corte">Suma al ingreso</th>
                     <th class="g-descuentos t-descuentos corte">Se descuenta</th>
                   </tr>
                   <tr>
-                    <th class="num corte">Horas suplementarias (+50%)</th>
-                    <th class="num">Horas extraordinarias (+100%)</th>
-                    <th class="num">Horas nocturnas (+25%)</th>
+                    <th class="num corte">Horas suplementarias</th>
+                    <th class="num">Horas extraordinarias</th>
+                    <th class="num">Sábado, domingo o feriado</th>
+                    <th class="num">Horas nocturnas</th>
                     <th class="num">Comisiones y bonos ($)</th>
                     <th class="num corte">Anticipos y otros ($)</th>
                   </tr>
@@ -74,12 +82,17 @@ const COLUMNAS: { campo: Campo; etiqueta: string; corte?: boolean }[] = [
                 <tbody>
                   @for (f of filas(); track f.empleadoId; let i = $index) {
                     <tr>
-                      <td>{{ f.nombres }}<span class="secundario">{{ f.cargo }}</span></td>
+                      <td>
+                        {{ f.nombres }}
+                        <span class="secundario">{{ f.cargo }} · {{ regimen(f) }}</span>
+                      </td>
                       <td class="num">{{ f.sueldoBase | dinero }}</td>
                       @for (c of columnas; track c.campo) {
                         <td [class.corte]="c.corte">
                           <input class="entrada entrada-compacta num" type="number" step="0.01" min="0"
                                  inputmode="decimal" placeholder="0"
+                                 [disabled]="!!c.extra && !f.recibeHorasExtras"
+                                 [attr.title]="c.extra && !f.recibeHorasExtras ? 'Este empleado no recibe horas extras' : null"
                                  [value]="f[c.campo]"
                                  (input)="cambiar(i, c.campo, $any($event.target).value)"
                                  [attr.aria-label]="c.etiqueta + ' de ' + f.nombres" />
@@ -103,10 +116,23 @@ const COLUMNAS: { campo: Campo; etiqueta: string; corte?: boolean }[] = [
         <div class="hoja" style="margin-top: 1.5rem">
           <div class="hoja-cuerpo pequeno apoyo">
             <p>
-              <strong>Cómo se valoran las horas.</strong> El valor de una hora es el sueldo base dividido para 240.
-              Las suplementarias se pagan a 1.5 veces ese valor y las extraordinarias (sábados, domingos y feriados)
-              a 2 veces. En las nocturnas solo se suma el recargo del 25%, porque la hora ya está dentro del sueldo.
+              <strong>Cómo se valoran las horas.</strong> El valor de una hora es el sueldo base dividido para 240,
+              más el recargo del régimen del empleado. Las suplementarias son las que siguen a la jornada hasta las
+              24h00; las extraordinarias van de 24h00 a 06h00 en días hábiles; las de sábado, domingo y feriado tienen
+              su propio recargo. En las nocturnas solo se suma el recargo, porque la hora ya está dentro del sueldo.
             </p>
+            <ul class="sin-vinetas">
+              @for (r of reglasPropias(); track r.codigo) {
+                <li>
+                  <strong>{{ r.nombre }}:</strong>
+                  suplementarias {{ r.recargoSuplementarias | percent: '1.0-0' }},
+                  extraordinarias {{ r.recargoExtraordinarias | percent: '1.0-0' }},
+                  sábado, domingo y feriado {{ r.recargoDescanso | percent: '1.0-0' }},
+                  nocturnas {{ r.recargoNocturno | percent: '1.0-0' }}
+                  @if (r.topeSuplementariasMes !== null) { (tope de {{ r.topeSuplementariasMes }} suplementarias al mes) }.
+                </li>
+              }
+            </ul>
             <p style="margin: 0">Quien ingresó durante el mes cobra solo los días trabajados.</p>
           </div>
         </div>
@@ -134,6 +160,9 @@ export class NovedadesMes {
   protected readonly filas = signal<Fila[]>([]);
   protected readonly generando = signal(false);
   protected readonly nombreMes = computed(() => this.parametros()?.meses[Number(this.mes()) - 1] ?? '');
+  protected readonly reglasPropias = computed(
+    () => this.parametros()?.regimenes.filter((r) => r.tipo === 'reglas') ?? [],
+  );
 
   protected readonly periodo = httpResource<Periodo>(
     () => `/api/roles/periodo/${this.anio()}/${this.mes()}`,
@@ -152,14 +181,22 @@ export class NovedadesMes {
           nombres: e.nombres,
           cargo: e.cargo,
           sueldoBase: e.sueldoBase,
-          horas50: texto(e.novedades.horas50),
-          horas100: texto(e.novedades.horas100),
+          regimen: e.regimen,
+          regimenAplicado: e.regimenAplicado,
+          recibeHorasExtras: e.recibeHorasExtras,
+          horasSuplementarias: texto(e.novedades.horasSuplementarias),
+          horasExtraordinarias: texto(e.novedades.horasExtraordinarias),
+          horasDescanso: texto(e.novedades.horasDescanso),
           horasNocturnas: texto(e.novedades.horasNocturnas),
           comisiones: texto(e.novedades.comisiones),
           otrosDescuentos: texto(e.novedades.otrosDescuentos),
         })),
       );
     });
+  }
+
+  protected regimen(f: Fila): string {
+    return etiquetaRegimen(this.parametros()?.regimenes, f.regimen, f.regimenAplicado);
   }
 
   protected cambiar(indice: number, campo: Campo, valor: string) {
@@ -171,14 +208,19 @@ export class NovedadesMes {
     this.generando.set(true);
     try {
       const novedades: NovedadEnviada[] = this.filas().map(
-        ({ empleadoId, horas50, horas100, horasNocturnas, comisiones, otrosDescuentos }) => ({
-          empleadoId, horas50, horas100, horasNocturnas, comisiones, otrosDescuentos,
+        ({
+          empleadoId, horasSuplementarias, horasExtraordinarias, horasDescanso, horasNocturnas,
+          comisiones, otrosDescuentos,
+        }) => ({
+          empleadoId, horasSuplementarias, horasExtraordinarias, horasDescanso, horasNocturnas,
+          comisiones, otrosDescuentos,
         }),
       );
       const r = await firstValueFrom(
         this.api.generarRol(Number(this.anio()), Number(this.mes()), novedades),
       );
       this.avisos.exito(`Rol de ${this.nombreMes()} ${this.anio()} generado para ${r.empleados} empleados.`);
+      r.avisos?.forEach((a) => this.avisos.aviso(a));
       await this.router.navigate(['/sistema/roles', r.id]);
     } catch (error) {
       this.avisos.errorHttp(error);

@@ -1,5 +1,6 @@
 import { httpResource } from '@angular/common/http';
-import { Component, effect, inject, input, signal } from '@angular/core';
+import { Component, computed, effect, inject, input, signal } from '@angular/core';
+import { toSignal } from '@angular/core/rxjs-interop';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
 import { firstValueFrom } from 'rxjs';
@@ -7,7 +8,7 @@ import { firstValueFrom } from 'rxjs';
 import { Api, ParametrosLey, valorSeguro } from '../../core/api';
 import { Avisos } from '../../core/avisos';
 import { DineroPipe } from '../../core/dinero.pipe';
-import type { DatosEmpleado, Empleado } from '../../core/modelos';
+import type { DatosEmpleado, Empleado, Grado } from '../../core/modelos';
 
 /** Alta y edición: la ruta /empleados/:id/editar entrega `id`; /empleados/nuevo no. */
 @Component({
@@ -43,6 +44,44 @@ import type { DatosEmpleado, Empleado } from '../../core/modelos';
             </select>
           </div>
           <div class="campo c3">
+            <label for="regimen">Régimen laboral</label>
+            <select class="entrada" id="regimen" formControlName="regimen">
+              @for (r of parametros()?.regimenes; track r.codigo) {
+                <option [value]="r.codigo">{{ r.nombre }}</option>
+              }
+            </select>
+            @if (regimenElegido(); as r) {
+              <span class="ayuda">
+                {{ r.descripcion }}
+                @if (!r.verificado) { <strong>Algunos valores de este régimen están por confirmar.</strong> }
+              </span>
+            }
+          </div>
+          @if (esMixto()) {
+            <div class="campo c3">
+              <label for="categoriaLoep">Categoría en la empresa pública</label>
+              <select class="entrada" id="categoriaLoep" formControlName="categoriaLoep">
+                <option value="">Elige una categoría</option>
+                <option value="servidor">Servidor público (se rige por la LOSEP)</option>
+                <option value="obrero">Obrero (se rige por el Código del Trabajo)</option>
+              </select>
+              <span class="ayuda">La categoría decide qué reglas se aplican en el rol.</span>
+            </div>
+          }
+          @if (grados().length) {
+            <div class="campo c3">
+              <label for="escalaId">Grado de la escala salarial</label>
+              <select class="entrada" id="escalaId" formControlName="escalaId"
+                      (change)="elegirGrado($any($event.target).value)">
+                <option value="">Sin grado: el sueldo se escribe a mano</option>
+                @for (g of grados(); track g.id) {
+                  <option [value]="g.id">Grado {{ g.grado }}: {{ g.denominacion }} ({{ g.rmu | dinero }})</option>
+                }
+              </select>
+              <span class="ayuda">Al elegir un grado se llena el sueldo con su remuneración. Puedes cambiarlo.</span>
+            </div>
+          }
+          <div class="campo c3">
             <label for="sueldoBase">Sueldo base (USD)</label>
             <input class="entrada num" id="sueldoBase" type="number" step="0.01" min="0.01"
                    formControlName="sueldoBase" />
@@ -55,6 +94,35 @@ import type { DatosEmpleado, Empleado } from '../../core/modelos';
             <input class="entrada" id="fechaIngreso" type="date" formControlName="fechaIngreso" />
             <span class="ayuda">Si ingresa a mitad de mes, el primer rol paga solo los días trabajados.</span>
           </div>
+          <fieldset class="campo c6 beneficios">
+            <legend>Beneficios de este empleado</legend>
+            <p class="ayuda">
+              Si no cambias nada, se aplica lo que diga el régimen: los décimos y los fondos de reserva se pagan
+              cada mes en el rol, y las horas extras se pagan. Cámbialo si el trabajador pidió acumularlos o no
+              los recibe.
+            </p>
+            <div class="rejilla-beneficios">
+              @for (b of beneficios; track b.control) {
+                <div class="campo">
+                  <label [for]="b.control">{{ b.etiqueta }}</label>
+                  <select class="entrada" [id]="b.control" [formControlName]="b.control">
+                    <option value="">Según el régimen</option>
+                    <option value="mensual">Se paga cada mes en el rol</option>
+                    <option value="acumulado">Lo acumula (el empleador lo provisiona)</option>
+                    <option value="no">No lo recibe</option>
+                  </select>
+                </div>
+              }
+              <div class="campo">
+                <label for="recibeHorasExtras">Horas extras</label>
+                <select class="entrada" id="recibeHorasExtras" formControlName="recibeHorasExtras">
+                  <option value="">Según el régimen</option>
+                  <option value="si">Las recibe</option>
+                  <option value="no">No las recibe</option>
+                </select>
+              </div>
+            </div>
+          </fieldset>
           <div class="acciones">
             <button class="boton" [disabled]="guardando()">Guardar empleado</button>
             <a class="boton boton-claro" routerLink="/sistema/empleados">Cancelar</a>
@@ -78,8 +146,45 @@ export class FormularioEmpleado {
     nombres: ['', Validators.required],
     cargo: ['', Validators.required],
     tipoContrato: ['Indefinido', Validators.required],
+    regimen: ['CODIGO_TRABAJO', Validators.required],
+    categoriaLoep: [''],
+    escalaId: [''],
+    pagoDecimoTercero: [''],
+    pagoDecimoCuarto: [''],
+    pagoFondosReserva: [''],
+    recibeHorasExtras: [''],
     sueldoBase: [null as number | null, [Validators.required, Validators.min(0.01)]],
     fechaIngreso: ['', Validators.required],
+  });
+
+  protected readonly beneficios = [
+    { control: 'pagoDecimoTercero', etiqueta: 'Décimo tercero' },
+    { control: 'pagoDecimoCuarto', etiqueta: 'Décimo cuarto' },
+    { control: 'pagoFondosReserva', etiqueta: 'Fondos de reserva' },
+  ] as const;
+
+  private readonly regimenSeleccionado = toSignal(this.form.controls.regimen.valueChanges, {
+    initialValue: this.form.controls.regimen.value,
+  });
+  protected readonly regimenElegido = computed(() =>
+    this.parametros()?.regimenes.find((r) => r.codigo === this.regimenSeleccionado()),
+  );
+  protected readonly esMixto = computed(() => this.regimenElegido()?.tipo === 'mixto');
+
+  private readonly categoriaSeleccionada = toSignal(this.form.controls.categoriaLoep.valueChanges, {
+    initialValue: this.form.controls.categoriaLoep.value,
+  });
+  /** Régimen cuyas reglas (y escala) se aplican: en la LOEP lo decide la categoría. */
+  private readonly regimenQueSeAplica = computed(() => {
+    const r = this.regimenElegido();
+    if (r?.tipo !== 'mixto') return r?.codigo;
+    return this.categoriaSeleccionada() === 'obrero' ? r.regimenObrero : r.regimenServidor;
+  });
+
+  private readonly escala = valorSeguro(httpResource<Grado[]>(() => '/api/escala'));
+  protected readonly grados = computed(() => {
+    const aplicado = this.regimenQueSeAplica();
+    return (this.escala() ?? []).filter((g) => g.regimen === aplicado);
   });
 
   private readonly actual = valorSeguro(
@@ -90,8 +195,34 @@ export class FormularioEmpleado {
     // Al llegar el empleado a editar, se llenan los campos.
     effect(() => {
       const e = this.actual();
-      if (e) this.form.patchValue(e);
+      if (e) {
+        this.form.patchValue({
+          ...e,
+          categoriaLoep: e.categoriaLoep ?? '',
+          escalaId: e.escalaId ? String(e.escalaId) : '',
+          pagoDecimoTercero: e.pagoDecimoTercero ?? '',
+          pagoDecimoCuarto: e.pagoDecimoCuarto ?? '',
+          pagoFondosReserva: e.pagoFondosReserva ?? '',
+          recibeHorasExtras: e.recibeHorasExtras === null ? '' : e.recibeHorasExtras ? 'si' : 'no',
+        });
+      }
     });
+
+    // Si el régimen cambia y el grado elegido ya no pertenece a su escala, se quita.
+    effect(() => {
+      const grados = this.grados();
+      if (!this.escala()) return;
+      const actual = this.form.controls.escalaId.value;
+      if (actual && !grados.some((g) => String(g.id) === actual)) this.form.controls.escalaId.setValue('');
+    });
+  }
+
+  /** Elegir un grado propone su remuneración como sueldo y su denominación como cargo. */
+  protected elegirGrado(valor: string) {
+    const grado = this.grados().find((g) => String(g.id) === valor);
+    if (!grado) return;
+    this.form.controls.sueldoBase.setValue(grado.rmu);
+    if (!this.form.controls.cargo.value.trim()) this.form.controls.cargo.setValue(grado.denominacion);
   }
 
   protected async guardar() {
@@ -101,7 +232,23 @@ export class FormularioEmpleado {
       this.avisos.error('Completa todos los campos antes de guardar.');
       return;
     }
-    const datos = this.form.getRawValue() as DatosEmpleado;
+    const {
+      categoriaLoep, escalaId, pagoDecimoTercero, pagoDecimoCuarto, pagoFondosReserva, recibeHorasExtras,
+      ...resto
+    } = this.form.getRawValue();
+    if (this.esMixto() && !categoriaLoep) {
+      this.avisos.error('Elige si el empleado es servidor u obrero.');
+      return;
+    }
+    const datos = {
+      ...resto,
+      categoriaLoep: this.esMixto() ? categoriaLoep : null,
+      escalaId: escalaId ? Number(escalaId) : null,
+      pagoDecimoTercero: pagoDecimoTercero || null,
+      pagoDecimoCuarto: pagoDecimoCuarto || null,
+      pagoFondosReserva: pagoFondosReserva || null,
+      recibeHorasExtras: recibeHorasExtras === '' ? null : recibeHorasExtras === 'si',
+    } as DatosEmpleado;
     this.guardando.set(true);
     try {
       const id = this.id();

@@ -12,11 +12,22 @@ const PARAMETROS = {
   fraccionExentaIr: 12208,
   tablaIr: [{ desde: 0, hasta: 12208, cuota: 0, porcentaje: 0 }, { desde: 109956, hasta: null, cuota: 24572, porcentaje: 0.37 }],
   empresa: { nombre: 'Empresa Demo S.A.', ruc: '1790000000001' }, meses: [], contratos: [],
+  categoriasLoep: ['servidor', 'obrero'],
+  regimenes: [
+    { codigo: 'CODIGO_TRABAJO', nombre: 'Código del Trabajo', tipo: 'reglas', iessPersonal: 0.0945, iessPatronal: 0.1115,
+      recargoSuplementarias: 0.5, recargoExtraordinarias: 1, recargoDescanso: 1, recargoNocturno: 0.25,
+      diasVacaciones: 15, fondosReserva: 0.0833, verificado: true },
+    { codigo: 'LOSEP', nombre: 'LOSEP (servidores públicos)', tipo: 'reglas', iessPersonal: 0.1145, iessPatronal: 0.0915,
+      recargoSuplementarias: 0.25, recargoExtraordinarias: 0.6, recargoDescanso: 1, recargoNocturno: 0.25,
+      diasVacaciones: 30, fondosReserva: 0.0833, verificado: false },
+    { codigo: 'LOEP', nombre: 'LOEP (empresas públicas)', tipo: 'mixto', verificado: true },
+  ],
 };
 
 const SIMULACION = {
   totalIngresos: 2000, totalDescuentos: 257.02, netoPagar: 1742.98, aporteIess: 189,
-  impuestoRenta: 68.02, costoEmpleador: 2589.77,
+  impuestoRenta: 68.02, costoEmpleador: 2589.77, beneficiosMensuales: 373.44,
+  regimenAplicado: 'Código del Trabajo', tasaIessPersonal: 0.0945, tasaIessPatronal: 0.1115,
 };
 
 describe('Landing', () => {
@@ -81,7 +92,9 @@ describe('Landing', () => {
     const pedidos = http.match('/api/simulacion');
     const ultimo = pedidos[pedidos.length - 1];
     expect(ultimo.request.method).toBe('POST');
-    expect(ultimo.request.body).toEqual({ sueldo: 2000, horas50: 0 });
+    expect(ultimo.request.body).toEqual({
+      sueldo: 2000, horasSuplementarias: 0, regimen: 'CODIGO_TRABAJO', decimos: 'mensual',
+    });
     ultimo.flush(SIMULACION);
     await vi.advanceTimersByTimeAsync(0);
     TestBed.tick();
@@ -89,6 +102,60 @@ describe('Landing', () => {
 
     expect(el.querySelector('.mini-ecuacion')?.textContent).toContain('$1,742.98');
     expect(el.querySelector('.desglose')?.textContent).toContain('$68.02');
+  });
+
+  it('muestra las reglas de cada régimen', async () => {
+    const fixture = crear();
+    responderInicio();
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    const texto = (fixture.nativeElement as HTMLElement).textContent ?? '';
+    expect(texto).toContain('Ver las reglas de cada régimen laboral');
+    expect(texto).toContain('LOSEP (servidores públicos)');
+    expect(texto).toContain('11.45%');
+    expect(texto).toContain('30 días');
+  });
+
+  it('el simulador envía el régimen elegido y pide la categoría si es LOEP', async () => {
+    vi.useFakeTimers();
+    const fixture = crear();
+    const el = fixture.nativeElement as HTMLElement;
+    responderInicio();
+    await vi.advanceTimersByTimeAsync(0);
+    TestBed.tick();
+    fixture.detectChanges();
+
+    const selector = el.querySelector<HTMLSelectElement>('#sim-regimen')!;
+    selector.value = 'LOEP';
+    selector.dispatchEvent(new Event('change'));
+    fixture.detectChanges();
+    expect(el.querySelector('#sim-categoria')).not.toBeNull();
+
+    await vi.advanceTimersByTimeAsync(300);
+    TestBed.tick();
+    const pedidos = http.match('/api/simulacion');
+    expect(pedidos[pedidos.length - 1].request.body).toEqual({
+      sueldo: 1200, horasSuplementarias: 0, regimen: 'LOEP', categoriaLoep: 'servidor', decimos: 'mensual',
+    });
+  });
+
+  it('el simulador envía si los décimos se pagan, se acumulan o no se reciben', async () => {
+    vi.useFakeTimers();
+    const fixture = crear();
+    const el = fixture.nativeElement as HTMLElement;
+    responderInicio();
+    await vi.advanceTimersByTimeAsync(0);
+    TestBed.tick();
+    fixture.detectChanges();
+
+    const selector = el.querySelector<HTMLSelectElement>('#sim-decimos')!;
+    selector.value = 'acumulado';
+    selector.dispatchEvent(new Event('change'));
+    await vi.advanceTimersByTimeAsync(300);
+    TestBed.tick();
+    const pedidos = http.match('/api/simulacion');
+    expect(pedidos[pedidos.length - 1].request.body.decimos).toBe('acumulado');
   });
 
   it('si el servidor no responde, la página sigue funcionando y lo explica', async () => {

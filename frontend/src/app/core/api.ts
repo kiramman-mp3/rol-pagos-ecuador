@@ -5,19 +5,26 @@ import type {
   DatosEmpleado,
   Empleado,
   EntradaSimulacion,
+  Grado,
   Parametros,
-  ResultadoRol,
+  Regimen,
+  ResultadoSimulacion,
+  TramoIr,
 } from './modelos';
 
 /** Lo que se digita en la grilla: texto de los campos, vacío = 0. */
 export interface NovedadEnviada {
   empleadoId: number;
-  horas50: string;
-  horas100: string;
+  horasSuplementarias: string;
+  horasExtraordinarias: string;
+  horasDescanso: string;
   horasNocturnas: string;
   comisiones: string;
   otrosDescuentos: string;
 }
+
+/** Lo que se envía al crear o editar un grado de la escala salarial. */
+export type DatosGrado = Omit<Grado, 'id'>;
 
 /**
  * Valor de un recurso HTTP, o undefined mientras carga o si falló.
@@ -52,7 +59,7 @@ export class Api {
   }
 
   generarRol(anio: number, mes: number, novedades: NovedadEnviada[]) {
-    return this.http.post<{ id: number; empleados: number }>('/api/roles/generar', {
+    return this.http.post<{ id: number; empleados: number; avisos: string[] }>('/api/roles/generar', {
       anio,
       mes,
       novedades,
@@ -62,8 +69,24 @@ export class Api {
     return this.http.delete<void>(`/api/roles/${id}`);
   }
 
+  guardarParametros(anio: number, datos: { sbu: number; tablaIr: TramoIr[]; fuente: string }) {
+    return this.http.put<unknown>(`/api/parametros/${anio}`, datos);
+  }
+  guardarRegimen(codigo: string, datos: Record<string, unknown>) {
+    return this.http.put<Regimen>(`/api/regimenes/${codigo}`, datos);
+  }
+  crearGrado(datos: DatosGrado) {
+    return this.http.post<Grado>('/api/escala', datos);
+  }
+  editarGrado(id: number, datos: DatosGrado) {
+    return this.http.put<Grado>(`/api/escala/${id}`, datos);
+  }
+  eliminarGrado(id: number) {
+    return this.http.delete<void>(`/api/escala/${id}`);
+  }
+
   simular(entrada: EntradaSimulacion) {
-    return this.http.post<ResultadoRol>('/api/simulacion', entrada);
+    return this.http.post<ResultadoSimulacion>('/api/simulacion', entrada);
   }
 }
 

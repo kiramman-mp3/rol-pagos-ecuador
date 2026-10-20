@@ -1,15 +1,17 @@
 import { httpResource } from '@angular/common/http';
+import { PercentPipe } from '@angular/common';
 import { Component, computed, inject, input } from '@angular/core';
 import { RouterLink } from '@angular/router';
 
 import { ParametrosLey, valorSeguro } from '../../core/api';
 import { DineroPipe } from '../../core/dinero.pipe';
-import type { RolCompleto } from '../../core/modelos';
+import type { Modalidad, RolCompleto, RolDetalle } from '../../core/modelos';
+import { etiquetaRegimen } from '../../core/regimen';
 
 /** Comprobante individual, pensado para imprimirse en una sola hoja. */
 @Component({
   selector: 'app-boleta',
-  imports: [RouterLink, DineroPipe],
+  imports: [RouterLink, DineroPipe, PercentPipe],
   template: `
     <div class="acciones no-imprimir" style="margin-bottom: 1.25rem">
       <a class="boton boton-claro" [routerLink]="['/sistema/roles', id()]">Volver al rol</a>
@@ -29,6 +31,7 @@ import type { RolCompleto } from '../../core/modelos';
             <div><dt>Empleado</dt><dd>{{ d.nombres }}</dd></div>
             <div><dt>Cédula</dt><dd>{{ d.cedula }}</dd></div>
             <div><dt>Cargo</dt><dd>{{ d.cargo }}</dd></div>
+            <div><dt>Régimen</dt><dd>{{ regimen(d) }}</dd></div>
             <div><dt>Ingreso</dt><dd>{{ d.fechaIngreso }}</dd></div>
           </dl>
 
@@ -45,17 +48,29 @@ import type { RolCompleto } from '../../core/modelos';
                   <td>Sueldo@if (d.diasTrabajados < 30) { ({{ d.diasTrabajados }} días)}</td>
                   <td class="num">{{ d.sueldo | dinero }}</td>
                 </tr>
-                @if (d.horas50) {
-                  <tr><td>Horas suplementarias al 50% ({{ d.horas50 }} h)</td><td class="num">{{ d.valorHoras50 | dinero }}</td></tr>
+                @if (d.horasSuplementarias) {
+                  <tr><td>Horas suplementarias ({{ d.horasSuplementarias }} h)</td><td class="num">{{ d.valorHorasSuplementarias | dinero }}</td></tr>
                 }
-                @if (d.horas100) {
-                  <tr><td>Horas extraordinarias al 100% ({{ d.horas100 }} h)</td><td class="num">{{ d.valorHoras100 | dinero }}</td></tr>
+                @if (d.horasExtraordinarias) {
+                  <tr><td>Horas extraordinarias ({{ d.horasExtraordinarias }} h)</td><td class="num">{{ d.valorHorasExtraordinarias | dinero }}</td></tr>
+                }
+                @if (d.horasDescanso) {
+                  <tr><td>Horas en sábado, domingo o feriado ({{ d.horasDescanso }} h)</td><td class="num">{{ d.valorHorasDescanso | dinero }}</td></tr>
                 }
                 @if (d.horasNocturnas) {
-                  <tr><td>Recargo nocturno del 25% ({{ d.horasNocturnas }} h)</td><td class="num">{{ d.valorRecargoNocturno | dinero }}</td></tr>
+                  <tr><td>Recargo nocturno ({{ d.horasNocturnas }} h)</td><td class="num">{{ d.valorRecargoNocturno | dinero }}</td></tr>
                 }
                 @if (d.comisiones) {
                   <tr><td>Comisiones y bonos</td><td class="num">{{ d.comisiones | dinero }}</td></tr>
+                }
+                @if (d.decimoTerceroModalidad === 'mensual') {
+                  <tr><td>Décimo tercer sueldo (pagado en el rol)</td><td class="num">{{ d.decimoTercero | dinero }}</td></tr>
+                }
+                @if (d.decimoCuartoModalidad === 'mensual') {
+                  <tr><td>Décimo cuarto sueldo (pagado en el rol)</td><td class="num">{{ d.decimoCuarto | dinero }}</td></tr>
+                }
+                @if (d.fondosReservaModalidad === 'mensual' && d.fondosReserva) {
+                  <tr><td>Fondos de reserva (pagados en el rol)</td><td class="num">{{ d.fondosReserva | dinero }}</td></tr>
                 }
               </tbody>
               <tfoot>
@@ -71,7 +86,7 @@ import type { RolCompleto } from '../../core/modelos';
                 </tr>
               </thead>
               <tbody>
-                <tr><td>Aporte personal al IESS (9.45%)</td><td class="num">{{ d.aporteIess | dinero }}</td></tr>
+                <tr><td>Aporte personal al IESS ({{ d.tasaIessPersonal | percent: '1.2-2' }})</td><td class="num">{{ d.aporteIess | dinero }}</td></tr>
                 <tr><td>Impuesto a la renta</td><td class="num">{{ d.impuestoRenta | dinero }}</td></tr>
                 @if (d.otrosDescuentos) {
                   <tr><td>Anticipos y otros</td><td class="num">{{ d.otrosDescuentos | dinero }}</td></tr>
@@ -101,11 +116,20 @@ import type { RolCompleto } from '../../core/modelos';
               </tr>
             </thead>
             <tbody>
-              <tr><td>Décimo tercer sueldo</td><td class="num">{{ d.decimoTercero | dinero }}</td></tr>
-              <tr><td>Décimo cuarto sueldo</td><td class="num">{{ d.decimoCuarto | dinero }}</td></tr>
+              <tr>
+                <td>Décimo tercer sueldo</td>
+                <td class="num">{{ d.decimoTerceroModalidad === 'acumulado' ? (d.decimoTercero | dinero) : pagado(d.decimoTerceroModalidad) }}</td>
+              </tr>
+              <tr>
+                <td>Décimo cuarto sueldo</td>
+                <td class="num">{{ d.decimoCuartoModalidad === 'acumulado' ? (d.decimoCuarto | dinero) : pagado(d.decimoCuartoModalidad) }}</td>
+              </tr>
               <tr><td>Vacaciones</td><td class="num">{{ d.vacaciones | dinero }}</td></tr>
-              <tr><td>Fondos de reserva</td><td class="num">{{ d.fondosReserva | dinero }}</td></tr>
-              <tr><td>Aporte patronal al IESS (11.15%)</td><td class="num">{{ d.aportePatronal | dinero }}</td></tr>
+              <tr>
+                <td>Fondos de reserva</td>
+                <td class="num">{{ d.fondosReservaModalidad === 'acumulado' ? (d.fondosReserva | dinero) : pagado(d.fondosReservaModalidad) }}</td>
+              </tr>
+              <tr><td>Aporte patronal al IESS ({{ d.tasaIessPatronal | percent: '1.2-2' }})</td><td class="num">{{ d.aportePatronal | dinero }}</td></tr>
             </tbody>
           </table>
 
@@ -138,6 +162,14 @@ export class Boleta {
   protected readonly nombreMes = computed(
     () => this.parametros()?.meses[(this.datos()?.mes ?? 1) - 1] ?? '',
   );
+
+  protected pagado(modalidad: Modalidad): string {
+    return modalidad === 'mensual' ? 'Pagado en el rol' : 'No recibe';
+  }
+
+  protected regimen(d: RolDetalle): string {
+    return etiquetaRegimen(this.parametros()?.regimenes, d.regimen, d.regimenAplicado);
+  }
 
   protected imprimir() {
     window.print();
