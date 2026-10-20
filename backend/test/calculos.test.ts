@@ -155,6 +155,20 @@ describe("reglas inyectadas", () => {
     assert.equal(sinImpuesto.netoPagar, 1811); // 2000 - 189 de IESS
   });
 
+  it("las vacaciones incluyen las horas extras y las comisiones (art. 71)", () => {
+    // sueldo 960 + 10 h suplementarias (60) + 100 de comisión = 1120; 1120 / 24 = 46.67
+    const r = calcularRol({
+      sueldoBase: 960, fechaIngreso: ANTIGUO, anio: 2026, mes: 10,
+      horasSuplementarias: 10, comisiones: 100,
+    });
+    assert.equal(r.vacaciones, 46.67);
+  });
+
+  it("los días de vacaciones del régimen definen la provisión", () => {
+    const r = calcularRol(base, { ...REGLAS_CT_2026, diasVacaciones: 30 });
+    assert.equal(r.vacaciones, 166.67); // 2000 * 30 / 360
+  });
+
   it("los meses para generar fondos de reserva son configurables", () => {
     const entrada = { ...base, fechaIngreso: "2026-04-01" }; // 6 meses de servicio
     assert.equal(calcularRol(entrada).fondosReserva, 0);

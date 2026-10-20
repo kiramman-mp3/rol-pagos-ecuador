@@ -47,6 +47,8 @@ export interface ReglasRol {
   mesesParaFondos: number;
   /** base del valor hora: 30 días x 8 horas */
   horasMes: number;
+  /** días de vacaciones al año: la provisión es días / 360 de lo percibido en el año */
+  diasVacaciones: number;
   /** recargo de las horas suplementarias sobre la hora normal (0.5 = +50%) */
   recargoSuplementarias: Monto;
   /** recargo de las horas extraordinarias: de 24h00 a 06h00 en días hábiles */
@@ -88,6 +90,7 @@ export const REGLAS_CT_2026: ReglasRol = {
   fondosReserva: "0.0833",
   mesesParaFondos: 12,
   horasMes: 240,
+  diasVacaciones: 15,
   recargoSuplementarias: "0.5",
   recargoExtraordinarias: 1,
   recargoDescanso: 1,
@@ -237,7 +240,9 @@ export function calcularRol(entrada: EntradaRol, reglas: ReglasRol = REGLAS_CT_2
   // Provisiones del empleador: se muestran, no se descuentan.
   const decimoTercero = q(totalIngresos.div(12));
   const decimoCuarto = q(sbu.times(dias).div(12 * 30)); // sobre el SBU, no el sueldo
-  const vacaciones = q(sueldo.div(24));
+  // Código del Trabajo art. 71: la 24ava parte de lo percibido en el año, con horas extras y
+  // retribuciones habituales. 15 días / 360 es esa misma fracción; con 30 días sería 1/12.
+  const vacaciones = q(totalIngresos.times(reglas.diasVacaciones).div(360));
   const fondos = meses >= reglas.mesesParaFondos ? q(totalIngresos.times(reglas.fondosReserva)) : D("0.00");
   const patronal = q(totalIngresos.times(reglas.iessPatronal));
   const provisiones = decimoTercero.plus(decimoCuarto).plus(vacaciones).plus(fondos).plus(patronal);
