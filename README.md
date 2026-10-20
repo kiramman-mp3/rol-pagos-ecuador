@@ -146,7 +146,7 @@ Todo el dinero se calcula con `decimal.js` y se redondea a centavos en cada rubr
 
 ### Escala salarial
 
-Una escala por régimen. La de la LOSEP trae 22 grados, de $527 a $4.500, tomados de una fuente secundaria (ecu11.com) que dice «20 grados» pero lista 22 y no cita el acuerdo ministerial: está **por confirmar**. Al elegir un grado en un empleado se propone el sueldo y el cargo, y se avisa si el sueldo difiere de la remuneración del grado. Un grado solo puede asignarse a un empleado cuyo régimen aplicado use esa escala.
+Una escala por régimen. La de la LOSEP trae 22 grados, de $527 a $4.500, tomados de una fuente secundaria (ecu11.com) que dice «20 grados» pero lista 22 y no cita el acuerdo ministerial: está **por confirmar**. Si el régimen aplicado a un empleado tiene escala, el grado se **escoge obligatoriamente de la tabla** y el sueldo es la remuneración de ese grado: el formulario lo llena y no se escribe a mano, y la API rechaza un sueldo distinto. El cargo se propone con la denominación del grado y se puede cambiar. Los regímenes sin escala (hoy el Código del Trabajo) siguen con sueldo libre. Un grado solo puede asignarse a un empleado cuyo régimen aplicado use esa escala.
 
 ### Conciliación con el IESS
 
