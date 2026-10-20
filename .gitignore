@@ -1,6 +1,3 @@
-__pycache__/
-*.pyc
-.venv/
+node_modules/
+backend/data/
 *.db
-.pytest_cache/
-.ruff_cache/
