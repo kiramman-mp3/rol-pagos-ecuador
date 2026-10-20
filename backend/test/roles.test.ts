@@ -51,7 +51,7 @@ describe("API de roles", () => {
         (x: { empleadoId: number }) => x.empleadoId === 2,
       );
       assert.equal(d.valorHorasSuplementarias, 112.5);
-      assert.equal(d.totalIngresos, 2112.5);
+      assert.equal(d.ingresosAportables, 2112.5); // sueldo + horas + comisiones
       assert.equal(d.otrosDescuentos, 30);
 
       const periodo = (await api.get("/api/roles/periodo/2026/10")).json;
@@ -166,10 +166,15 @@ describe("API de parámetros y simulación", () => {
   it("simula un rol sin guardar nada", async () => {
     const api = await iniciar();
     try {
+      // Por defecto los décimos y el fondo de reserva se pagan en el rol.
       const r = await api.post("/api/simulacion", { sueldo: 2000 });
       assert.equal(r.status, 200);
-      assert.equal(r.json.netoPagar, 1742.98);
+      assert.equal(r.json.netoPagar, 2116.42);
       assert.equal(r.json.impuestoRenta, 68.02);
+      assert.equal(r.json.decimoTerceroModalidad, "mensual");
+      // Si el trabajador los acumula, el neto es el del sueldo.
+      const acumulado = await api.post("/api/simulacion", { sueldo: 2000, decimos: "acumulado" });
+      assert.equal(acumulado.json.netoPagar, 1742.98);
       assert.equal((await api.get("/api/roles")).json.length, 0);
     } finally {
       api.cerrar();
