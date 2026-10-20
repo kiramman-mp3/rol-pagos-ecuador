@@ -188,6 +188,13 @@ th.c-neto { background: var(--neto-fondo); }
 .puesto h3 { margin: 0; font-size: 1.05rem; }
 .puesto .ficha-puesto { border: 0; padding: .4rem 0 0; margin: 0; }
 .acciones-puesto { margin-top: .4rem; }
+.responsable { display: flex; align-items: baseline; gap: .6rem; margin: .5rem 0 .2rem; }
+.responsable strong { font-size: 1.05rem; }
+.sin-responsable { color: var(--tinta-suave); font-style: italic; }
+.etiqueta-responsable { font-size: .75rem; font-weight: 600; text-transform: uppercase; letter-spacing: .04em; color: var(--tinta-suave); font-style: normal; }
+.asignar-responsable { display: flex; align-items: center; gap: .6rem; margin-top: .6rem; }
+.asignar-responsable label { font-size: .85rem; font-weight: 600; white-space: nowrap; }
+.asignar-responsable .entrada { max-width: 22rem; }
 .formulario .acciones { grid-column: 1 / -1; margin-top: .5rem; }
 .beneficios { border: 1px solid var(--linea); border-radius: var(--radio); padding: 1rem; margin: 0; min-width: 0; }
 .beneficios legend { font-weight: 600; padding: 0 .4rem; }

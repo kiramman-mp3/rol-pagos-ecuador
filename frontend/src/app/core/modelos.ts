@@ -258,4 +258,13 @@ export interface Puesto {
   referencia: Grado | null;
   /** Cuántos empleados lo ocupan */
   empleados: number;
+  /** Quién encabeza el puesto, si se le asignó un responsable */
+  responsable: Persona | null;
+  /** Los empleados activos que lo ocupan: de ellos sale el responsable */
+  ocupantes: Persona[];
+}
+
+export interface Persona {
+  id: number;
+  nombres: string;
 }
