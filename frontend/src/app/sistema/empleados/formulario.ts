@@ -68,23 +68,23 @@ import type { DatosEmpleado, Empleado, Grado } from '../../core/modelos';
               <span class="ayuda">La categoría decide qué reglas se aplican en el rol.</span>
             </div>
           }
-          @if (grados().length) {
+          @if (exigeGrado()) {
             <div class="campo c3">
-              <label for="escalaId">Grado de la escala salarial</label>
+              <label for="escalaId">Grado de la escala salarial (tabla del MDT)</label>
               <select class="entrada" id="escalaId" formControlName="escalaId"
                       (change)="elegirGrado($any($event.target).value)">
-                <option value="">Sin grado: el sueldo se escribe a mano</option>
+                <option value="">Elige un grado de la tabla</option>
                 @for (g of grados(); track g.id) {
                   <option [value]="g.id">Grado {{ g.grado }}: {{ g.denominacion }} ({{ g.rmu | dinero }})</option>
                 }
               </select>
-              <span class="ayuda">Al elegir un grado se llena el sueldo con su remuneración. Puedes cambiarlo.</span>
+              <span class="ayuda">El sueldo es la remuneración del grado, según la tabla del Ministerio del Trabajo.</span>
             </div>
           }
           <div class="campo c3">
             <label for="sueldoBase">Sueldo base (USD)</label>
             <input class="entrada num" id="sueldoBase" type="number" step="0.01" min="0.01"
-                   formControlName="sueldoBase" />
+                   formControlName="sueldoBase" [readOnly]="exigeGrado()" />
             @if (parametros(); as p) {
               <span class="ayuda">El sueldo básico unificado de {{ p.anio }} es {{ p.sbu | dinero }}.</span>
             }
@@ -187,6 +187,9 @@ export class FormularioEmpleado {
     return (this.escala() ?? []).filter((g) => g.regimen === aplicado);
   });
 
+  /** Si el régimen aplicado tiene escala, el grado es obligatorio y fija el sueldo. */
+  protected readonly exigeGrado = computed(() => this.grados().length > 0);
+
   private readonly actual = valorSeguro(
     httpResource<Empleado>(() => (this.id() ? `/api/empleados/${this.id()}` : undefined)),
   );
@@ -213,31 +216,41 @@ export class FormularioEmpleado {
       const grados = this.grados();
       if (!this.escala()) return;
       const actual = this.form.controls.escalaId.value;
-      if (actual && !grados.some((g) => String(g.id) === actual)) this.form.controls.escalaId.setValue('');
+      if (actual && !grados.some((g) => String(g.id) === actual)) {
+        this.form.controls.escalaId.setValue('');
+        this.form.controls.sueldoBase.setValue(null); // el sueldo venía del grado que se quitó
+      }
     });
   }
 
   /** Elegir un grado propone su remuneración como sueldo y su denominación como cargo. */
   protected elegirGrado(valor: string) {
     const grado = this.grados().find((g) => String(g.id) === valor);
-    if (!grado) return;
+    if (!grado) {
+      this.form.controls.sueldoBase.setValue(null);
+      return;
+    }
     this.form.controls.sueldoBase.setValue(grado.rmu);
     if (!this.form.controls.cargo.value.trim()) this.form.controls.cargo.setValue(grado.denominacion);
   }
 
   protected async guardar() {
     this.avisos.limpiar();
-    if (this.form.invalid) {
-      this.form.markAllAsTouched();
-      this.avisos.error('Completa todos los campos antes de guardar.');
-      return;
-    }
     const {
       categoriaLoep, escalaId, pagoDecimoTercero, pagoDecimoCuarto, pagoFondosReserva, recibeHorasExtras,
       ...resto
     } = this.form.getRawValue();
     if (this.esMixto() && !categoriaLoep) {
       this.avisos.error('Elige si el empleado es servidor u obrero.');
+      return;
+    }
+    if (this.exigeGrado() && !escalaId) {
+      this.avisos.error('Elige un grado de la escala salarial: el sueldo sale de la tabla del MDT.');
+      return;
+    }
+    if (this.form.invalid) {
+      this.form.markAllAsTouched();
+      this.avisos.error('Completa todos los campos antes de guardar.');
       return;
     }
     const datos = {

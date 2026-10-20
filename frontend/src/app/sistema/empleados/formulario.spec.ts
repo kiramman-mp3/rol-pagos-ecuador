@@ -17,8 +17,8 @@ const PARAMETROS = {
 const GRADOS = [
   { id: 11, regimen: 'LOSEP', grado: 5, denominacion: 'Servidor Público de Apoyo 3', rmu: 675, fuente: '' },
   { id: 12, regimen: 'LOSEP', grado: 7, denominacion: 'Servidor Público 1', rmu: 817, fuente: '' },
-  { id: 13, regimen: 'CODIGO_TRABAJO', grado: 1, denominacion: 'Operario', rmu: 500, fuente: '' },
 ];
+const GRADO_CODIGO = { id: 13, regimen: 'CODIGO_TRABAJO', grado: 1, denominacion: 'Operario', rmu: 500, fuente: '' };
 
 describe('FormularioEmpleado', () => {
   let http: HttpTestingController;
@@ -30,7 +30,7 @@ describe('FormularioEmpleado', () => {
     http = TestBed.inject(HttpTestingController);
   });
 
-  const abrir = async () => {
+  const abrir = async (grados = GRADOS) => {
     const fixture = TestBed.createComponent(FormularioEmpleado);
     fixture.detectChanges();
     TestBed.tick();
@@ -41,7 +41,7 @@ describe('FormularioEmpleado', () => {
         { ...PARAMETROS.regimenes[2], regimenServidor: 'LOSEP', regimenObrero: 'CODIGO_TRABAJO' },
       ],
     });
-    http.expectOne('/api/escala').flush(GRADOS);
+    http.expectOne('/api/escala').flush(grados);
     await fixture.whenStable();
     fixture.detectChanges();
     return { fixture, el: fixture.nativeElement as HTMLElement };
@@ -91,6 +91,8 @@ describe('FormularioEmpleado', () => {
     llenarBase(el);
     escribir(el, 'regimen', 'LOSEP', 'change');
     fixture.detectChanges();
+    escribir(el, 'escalaId', '11', 'change');
+    fixture.detectChanges();
 
     el.querySelector('form')!.dispatchEvent(new Event('submit'));
     const envio = http.expectOne('/api/empleados');
@@ -117,7 +119,7 @@ describe('FormularioEmpleado', () => {
   });
 
   it('ofrece solo los grados de la escala del régimen elegido', async () => {
-    const { fixture, el } = await abrir();
+    const { fixture, el } = await abrir([...GRADOS, GRADO_CODIGO]);
     expect(el.querySelector('#escalaId option[value="13"]')).not.toBeNull(); // Código del Trabajo
     expect(el.querySelector('#escalaId option[value="11"]')).toBeNull();
 
@@ -147,6 +149,28 @@ describe('FormularioEmpleado', () => {
     expect(envio.request.body.sueldoBase).toBe(675);
   });
 
+  it('con escala, el grado es obligatorio y el sueldo no se escribe a mano', async () => {
+    const { fixture, el } = await abrir();
+    llenarBase(el);
+    escribir(el, 'regimen', 'LOSEP', 'change');
+    fixture.detectChanges();
+    expect(el.querySelector<HTMLInputElement>('#sueldoBase')!.readOnly).toBe(true);
+
+    el.querySelector('form')!.dispatchEvent(new Event('submit'));
+    http.expectNone('/api/empleados'); // falta el grado
+
+    escribir(el, 'escalaId', '12', 'change');
+    fixture.detectChanges();
+    el.querySelector('form')!.dispatchEvent(new Event('submit'));
+    expect(http.expectOne('/api/empleados').request.body.sueldoBase).toBe(817);
+  });
+
+  it('sin escala en el régimen, el sueldo se escribe a mano', async () => {
+    const { el } = await abrir();
+    expect(el.querySelector('#escalaId')).toBeNull();
+    expect(el.querySelector<HTMLInputElement>('#sueldoBase')!.readOnly).toBe(false);
+  });
+
   it('un cargo ya escrito no se pisa al elegir el grado', async () => {
     const { fixture, el } = await abrir();
     escribir(el, 'regimen', 'LOSEP', 'change');
@@ -169,11 +193,12 @@ describe('FormularioEmpleado', () => {
     fixture.detectChanges();
     TestBed.tick();
     fixture.detectChanges();
-    expect(el.querySelector<HTMLSelectElement>('#escalaId')!.value).toBe('');
+    expect(el.querySelector('#escalaId')).toBeNull(); // el Código del Trabajo no tiene escala
+    expect(el.querySelector<HTMLInputElement>('#sueldoBase')!.value).toBe('');
   });
 
   it('en la LOEP la escala depende de la categoría', async () => {
-    const { fixture, el } = await abrir();
+    const { fixture, el } = await abrir([...GRADOS, GRADO_CODIGO]);
     escribir(el, 'regimen', 'LOEP', 'change');
     fixture.detectChanges(); // aparece el selector de categoría
     escribir(el, 'categoriaLoep', 'servidor', 'change');
