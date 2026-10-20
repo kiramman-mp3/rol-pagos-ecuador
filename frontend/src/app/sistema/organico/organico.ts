@@ -57,6 +57,14 @@ interface Linea {
                 {{ l.puesto.empleados }} {{ l.puesto.empleados === 1 ? 'empleado' : 'empleados' }}
               </span>
             </header>
+            <p class="responsable" [class.sin-responsable]="!l.puesto.responsable">
+              <span class="etiqueta-responsable">Responsable</span>
+              @if (l.puesto.responsable; as r) {
+                <strong>{{ r.nombres }}</strong>
+              } @else {
+                Sin responsable asignado
+              }
+            </p>
             <dl class="ficha-puesto">
               <dt>Función</dt><dd>{{ l.puesto.funcion }}</dd>
               <dt>Responsabilidad</dt><dd>{{ l.puesto.responsabilidad }}</dd>
@@ -71,6 +79,20 @@ interface Linea {
                 }
               </dd>
             </dl>
+            @if (l.puesto.ocupantes.length) {
+              <div class="asignar-responsable no-imprimir">
+                <label [for]="'responsable-' + l.puesto.id">Cambiar responsable</label>
+                <select class="entrada" [id]="'responsable-' + l.puesto.id"
+                        (change)="asignarResponsable(l.puesto, $any($event.target).value)">
+                  <option value="" [selected]="!l.puesto.responsable">Sin responsable</option>
+                  @for (o of l.puesto.ocupantes; track o.id) {
+                    <option [value]="o.id" [selected]="l.puesto.responsable?.id === o.id">{{ o.nombres }}</option>
+                  }
+                </select>
+              </div>
+            } @else {
+              <p class="apoyo pequeno">Nadie ocupa este puesto todavía: asigna el puesto al crear o editar un empleado.</p>
+            }
             <div class="acciones-puesto">
               <button class="boton-texto" type="button" (click)="editar(l.puesto)">Editar</button>
               <button class="boton-texto boton-peligro" type="button" (click)="eliminar(l.puesto)">Eliminar</button>
@@ -201,6 +223,23 @@ export class Organico {
       escalaId: p.escalaId === null ? '' : String(p.escalaId),
     });
     window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
+  }
+
+  /** Pone o quita al responsable del puesto y refresca el orgánico. */
+  protected async asignarResponsable(p: Puesto, valor: string) {
+    this.avisos.limpiar();
+    try {
+      const actualizado = await firstValueFrom(this.api.asignarResponsable(p.id, valor === '' ? null : Number(valor)));
+      this.avisos.exito(
+        actualizado.responsable
+          ? `${actualizado.responsable.nombres} es el responsable de «${p.nombre}».`
+          : `«${p.nombre}» quedó sin responsable.`,
+      );
+    } catch (error) {
+      this.avisos.errorHttp(error);
+    } finally {
+      this.puestos.reload();
+    }
   }
 
   protected async eliminar(p: Puesto) {

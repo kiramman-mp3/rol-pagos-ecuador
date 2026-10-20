@@ -1,7 +1,7 @@
 import { Router } from "express";
 import type { DatabaseSync } from "node:sqlite";
 
-import { actualizarPuesto, buscarPuesto, crearPuesto, eliminarPuesto, listarPuestos } from "../puestos.ts";
+import { actualizarPuesto, asignarResponsable, buscarPuesto, crearPuesto, eliminarPuesto, listarPuestos } from "../puestos.ts";
 import { ErrorApi } from "../validaciones.ts";
 
 export function rutasPuestos(db: DatabaseSync): Router {
@@ -23,6 +23,11 @@ export function rutasPuestos(db: DatabaseSync): Router {
 
   router.put("/:id", (req, res) => {
     res.json(actualizarPuesto(db, Number(req.params.id), req.body ?? {}));
+  });
+
+  /** Asigna (`{ empleadoId: 3 }`) o quita (`{ empleadoId: null }`) al responsable del puesto. */
+  router.patch("/:id/responsable", (req, res) => {
+    res.json(asignarResponsable(db, Number(req.params.id), req.body?.empleadoId));
   });
 
   router.delete("/:id", (req, res) => {

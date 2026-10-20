@@ -22,7 +22,7 @@ const GRADOS: Grado[] = [
 const NIVEL_MINIMO: Grado = { id: 21, regimen: 'CODIGO_TRABAJO', grado: 2, denominacion: 'B1: Supervisión general', rmu: 495, rmuMax: 842, esMinimo: true, fuente: '' };
 const PUESTO: Puesto = {
   id: 31, nombre: 'Administrador / Contador', superiorId: null, funcion: 'Administrar los recursos.',
-  responsabilidad: 'Responde ante el gerente.', sector: 'Servicios', escalaId: 21, referencia: NIVEL_MINIMO, empleados: 0,
+  responsabilidad: 'Responde ante el gerente.', sector: 'Servicios', escalaId: 21, referencia: NIVEL_MINIMO, empleados: 0, responsable: null, ocupantes: [],
 };
 const GRADO_CODIGO: Grado = { id: 13, regimen: 'CODIGO_TRABAJO', grado: 1, denominacion: 'Operario', rmu: 500, rmuMax: null, esMinimo: false, fuente: '' };
 

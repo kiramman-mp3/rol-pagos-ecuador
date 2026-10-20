@@ -95,6 +95,9 @@ export class Api {
   editarPuesto(id: number, datos: DatosPuesto) {
     return this.http.put<Puesto>(`/api/puestos/${id}`, datos);
   }
+  asignarResponsable(id: number, empleadoId: number | null) {
+    return this.http.patch<Puesto>(`/api/puestos/${id}/responsable`, { empleadoId });
+  }
   eliminarPuesto(id: number) {
     return this.http.delete<void>(`/api/puestos/${id}`);
   }

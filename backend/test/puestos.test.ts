@@ -157,3 +157,75 @@ describe("empleados y orgánico", () => {
       }
     }));
 });
+
+describe("responsable de un puesto", () => {
+  const crear = async (api: Cliente, cedula: string, nombres: string, puestoId = PUESTO_AUXILIAR) =>
+    (await api.post("/api/empleados", { ...EMPLEADO, cedula, nombres, puestoId, escalaId: undefined })).json;
+
+  it("un puesto nuevo no tiene responsable y muestra a quienes lo ocupan", () =>
+    conApi(async (api) => {
+      const ana = await crear(api, "1801234566", "Ana Prueba");
+      const puesto = (await api.get(`/api/puestos/${PUESTO_AUXILIAR}`)).json;
+      assert.equal(puesto.responsable, null);
+      assert.deepEqual(puesto.ocupantes, [{ id: ana.id, nombres: "Ana Prueba" }]);
+    }));
+
+  it("se asigna un responsable entre quienes ocupan el puesto y sale su nombre", () =>
+    conApi(async (api) => {
+      const ana = await crear(api, "1801234566", "Ana Prueba");
+      await crear(api, "1702345677", "Beatriz Prueba");
+      const r = await api.patch(`/api/puestos/${PUESTO_AUXILIAR}/responsable`, { empleadoId: ana.id });
+      assert.equal(r.status, 200);
+      assert.deepEqual(r.json.responsable, { id: ana.id, nombres: "Ana Prueba" });
+      assert.equal(r.json.ocupantes.length, 2);
+      assert.equal((await api.get("/api/puestos")).json[4].responsable.nombres, "Ana Prueba");
+    }));
+
+  it("se puede quitar al responsable", () =>
+    conApi(async (api) => {
+      const ana = await crear(api, "1801234566", "Ana Prueba");
+      await api.patch(`/api/puestos/${PUESTO_AUXILIAR}/responsable`, { empleadoId: ana.id });
+      const r = await api.patch(`/api/puestos/${PUESTO_AUXILIAR}/responsable`, { empleadoId: null });
+      assert.equal(r.json.responsable, null);
+    }));
+
+  it("rechaza a quien no ocupa el puesto, a quien no existe y un puesto inexistente", () =>
+    conApi(async (api) => {
+      const ana = await crear(api, "1801234566", "Ana Prueba", 2);
+      const ajeno = await api.patch(`/api/puestos/${PUESTO_AUXILIAR}/responsable`, { empleadoId: ana.id });
+      assert.equal(ajeno.status, 400);
+      assert.match(ajeno.json.errores[0], /Ana Prueba no puede ser responsable/);
+      assert.equal((await api.patch(`/api/puestos/${PUESTO_AUXILIAR}/responsable`, { empleadoId: 999 })).status, 400);
+      assert.equal((await api.patch("/api/puestos/999/responsable", { empleadoId: null })).status, 404);
+    }));
+
+  it("quien cambia de puesto, se desactiva o se elimina deja de ser responsable", () =>
+    conApi(async (api) => {
+      const ana = await crear(api, "1801234566", "Ana Prueba");
+      const asignar = () => api.patch(`/api/puestos/${PUESTO_AUXILIAR}/responsable`, { empleadoId: ana.id });
+      const responsable = async () => (await api.get(`/api/puestos/${PUESTO_AUXILIAR}`)).json.responsable;
+
+      await asignar();
+      await api.put(`/api/empleados/${ana.id}`, { ...EMPLEADO, nombres: "Ana Prueba", puestoId: 2, escalaId: undefined });
+      assert.equal(await responsable(), null); // cambió de puesto
+
+      await api.put(`/api/empleados/${ana.id}`, { ...EMPLEADO, nombres: "Ana Prueba", puestoId: PUESTO_AUXILIAR, escalaId: undefined });
+      await asignar();
+      await api.patch(`/api/empleados/${ana.id}/estado`);
+      assert.equal(await responsable(), null); // quedó inactiva
+
+      await api.patch(`/api/empleados/${ana.id}/estado`);
+      await asignar();
+      await api.del(`/api/empleados/${ana.id}`);
+      assert.equal(await responsable(), null); // se eliminó
+    }));
+
+  it("en los datos de ejemplo, cada puesto tiene su responsable", () =>
+    conApi(async (api) => {
+      await api.post("/api/empleados/demo");
+      const nombres = (await api.get("/api/puestos")).json.map((p: { responsable: { nombres: string } | null }) => p.responsable?.nombres);
+      assert.deepEqual(nombres, [
+        "Johan Gabriel Rodríguez", "José Gabriel Manzano", "David Barragán", "Maybeline Navarro", "Luis Fernando Tipán",
+      ]);
+    }));
+});

@@ -14,7 +14,9 @@ const NIVEL_B1: Grado = {
 
 const puesto = (id: number, nombre: string, superiorId: number | null, referencia: Grado | null): Puesto => ({
   id, nombre, superiorId, funcion: `Función de ${nombre}.`, responsabilidad: `Responsabilidad de ${nombre}.`,
-  sector: 'Servicios', escalaId: referencia?.id ?? null, referencia, empleados: id === 2 ? 1 : 0,
+  sector: 'Servicios', escalaId: referencia?.id ?? null, referencia, empleados: id === 2 ? 2 : 0,
+  responsable: id === 2 ? { id: 7, nombres: 'José Gabriel Manzano' } : null,
+  ocupantes: id === 2 ? [{ id: 7, nombres: 'José Gabriel Manzano' }, { id: 8, nombres: 'Rosa Prueba' }] : [],
 });
 
 // Se entregan desordenados a propósito: el orgánico debe leerse de arriba abajo.
@@ -68,7 +70,34 @@ describe('Organico', () => {
     expect(gerente).toContain('Servicios');
     expect(gerente).toContain('A: Jefatura');
     expect(gerente).toContain('mínimo');
-    expect(el.textContent).toContain('1 empleado');
+    expect(el.textContent).toContain('2 empleados');
+  });
+
+  it('muestra el nombre del responsable de cada puesto o que no lo tiene', async () => {
+    const { el } = await abrir();
+    const [gerente, administrador] = [...el.querySelectorAll<HTMLElement>('article.puesto')];
+    expect(gerente.querySelector('.responsable')!.textContent).toContain('Sin responsable asignado');
+    expect(administrador.querySelector('.responsable strong')!.textContent).toBe('José Gabriel Manzano');
+    expect(gerente.textContent).toContain('Nadie ocupa este puesto todavía');
+  });
+
+  it('el select de responsable ofrece solo a quienes ocupan el puesto y guarda el cambio', async () => {
+    const { fixture, el } = await abrir();
+    const opciones = [...el.querySelectorAll('#responsable-2 option')].map((o) => o.textContent?.trim());
+    expect(opciones).toEqual(['Sin responsable', 'José Gabriel Manzano', 'Rosa Prueba']);
+    expect(el.querySelector('#responsable-1')).toBeNull(); // nadie ocupa el puesto 1
+
+    escribir(el, '#responsable-2', '8');
+    fixture.detectChanges();
+    const envio = http.expectOne('/api/puestos/2/responsable');
+    expect(envio.request.method).toBe('PATCH');
+    expect(envio.request.body).toEqual({ empleadoId: 8 });
+    envio.flush({ ...PUESTOS[2], responsable: { id: 8, nombres: 'Rosa Prueba' } });
+    await new Promise((resolver) => setTimeout(resolver));
+    TestBed.tick();
+    const recarga = http.match('/api/puestos');
+    expect(recarga.length).toBe(1); // se vuelve a pedir el orgánico
+    recarga[0].flush(PUESTOS);
   });
 
   it('al editar, un puesto no se ofrece a sí mismo ni a sus subordinados como superior', async () => {
