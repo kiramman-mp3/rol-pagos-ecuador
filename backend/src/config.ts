@@ -8,11 +8,23 @@ export const MESES = [
 
 export const CONTRATOS = ["Indefinido", "Plazo fijo", "Eventual", "Ocasional", "Obra o servicio"];
 
-export const EMPLEADOS_DEMO = [
-  ["1801234566", "María Fernanda Paredes", "Gerente General", 4500, "2019-03-01", "Indefinido"],
-  ["1702345677", "Carlos Andrés Villacís", "Contador", 1800, "2022-07-15", "Indefinido"],
-  ["0903456788", "Lucía Estefanía Mora", "Asistente Administrativa", 650, "2024-02-01", "Plazo fijo"],
-  ["0104567896", "José Luis Camacho", "Vendedor", 900, "2025-11-03", "Indefinido"],
-  ["1715678908", "Daniela Alejandra Ruiz", "Analista de Sistemas", 2600, "2023-05-10", "Indefinido"],
-  ["0606789014", "Pedro Pablo Guamán", "Bodeguero", 482, "2026-10-16", "Eventual"],
-] as const;
+export interface EmpleadoDemo {
+  cedula: string;
+  nombres: string;
+  cargo: string;
+  sueldoBase: number;
+  fechaIngreso: string;
+  tipoContrato: string;
+  regimen: string;
+  categoriaLoep: string | null;
+}
+
+/** Seis empleados que muestran los tres regímenes (Código del Trabajo, LOSEP y LOEP). */
+export const EMPLEADOS_DEMO: readonly EmpleadoDemo[] = [
+  { cedula: "1801234566", nombres: "María Fernanda Paredes", cargo: "Gerente General", sueldoBase: 4500, fechaIngreso: "2019-03-01", tipoContrato: "Indefinido", regimen: "CODIGO_TRABAJO", categoriaLoep: null },
+  { cedula: "1702345677", nombres: "Carlos Andrés Villacís", cargo: "Contador", sueldoBase: 1800, fechaIngreso: "2022-07-15", tipoContrato: "Indefinido", regimen: "CODIGO_TRABAJO", categoriaLoep: null },
+  { cedula: "0903456788", nombres: "Lucía Estefanía Mora", cargo: "Asistente Administrativa", sueldoBase: 675, fechaIngreso: "2024-02-01", tipoContrato: "Plazo fijo", regimen: "LOSEP", categoriaLoep: null },
+  { cedula: "0104567896", nombres: "José Luis Camacho", cargo: "Vendedor", sueldoBase: 900, fechaIngreso: "2025-11-03", tipoContrato: "Indefinido", regimen: "CODIGO_TRABAJO", categoriaLoep: null },
+  { cedula: "1715678908", nombres: "Daniela Alejandra Ruiz", cargo: "Analista de Sistemas", sueldoBase: 2600, fechaIngreso: "2023-05-10", tipoContrato: "Indefinido", regimen: "LOEP", categoriaLoep: "servidor" },
+  { cedula: "0606789014", nombres: "Pedro Pablo Guamán", cargo: "Bodeguero", sueldoBase: 482, fechaIngreso: "2026-10-16", tipoContrato: "Eventual", regimen: "LOEP", categoriaLoep: "obrero" },
+];

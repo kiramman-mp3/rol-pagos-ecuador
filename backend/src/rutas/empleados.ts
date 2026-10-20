@@ -5,6 +5,7 @@ import { CONTRATOS, EMPLEADOS_DEMO } from "../config.ts";
 import { consultar, ejecutar, filaACamel, uno } from "../db.ts";
 import type { Fila } from "../db.ts";
 import { parametrosDelAnio } from "../parametros.ts";
+import { CATEGORIAS_LOEP, indexarRegimenes, listarRegimenes } from "../regimenes.ts";
 import { aDecimal, cedulaValida, ErrorApi, fechaIsoValida } from "../validaciones.ts";
 
 interface DatosEmpleado {
@@ -14,6 +15,8 @@ interface DatosEmpleado {
   sueldoBase: number;
   fechaIngreso: string;
   tipoContrato: string;
+  regimen: string;
+  categoriaLoep: string | null;
 }
 
 /** Reglas de negocio del formulario. Devuelve los datos limpios y los avisos no bloqueantes. */
@@ -29,11 +32,24 @@ function validar(
   const cargo = texto("cargo");
   const tipoContrato = texto("tipoContrato");
   const fechaIngreso = texto("fechaIngreso");
+  const regimen = texto("regimen") || "CODIGO_TRABAJO";
 
   if (!cedulaValida(cedula)) errores.push("La cédula no es válida (10 dígitos, módulo 10).");
   if (!nombres || !cargo) errores.push("Nombres y cargo son obligatorios.");
   if (!CONTRATOS.includes(tipoContrato)) errores.push("Tipo de contrato inválido.");
   if (!fechaIsoValida(fechaIngreso)) errores.push("Fecha de ingreso inválida.");
+
+  // El régimen existe y, si es mixto (LOEP), hace falta saber si es servidor u obrero.
+  const elegido = indexarRegimenes(listarRegimenes(db)).get(regimen);
+  let categoriaLoep: string | null = null;
+  if (!elegido) {
+    errores.push("El régimen laboral no existe.");
+  } else if (elegido.tipo === "mixto") {
+    categoriaLoep = texto("categoriaLoep");
+    if (!(CATEGORIAS_LOEP as readonly string[]).includes(categoriaLoep)) {
+      errores.push(`${elegido.nombre}: indica si el empleado es servidor u obrero.`);
+    }
+  }
 
   let sueldoBase = 0;
   try {
@@ -51,7 +67,10 @@ function validar(
   }
 
   if (errores.length) throw new ErrorApi(400, errores);
-  return { datos: { cedula, nombres, cargo, sueldoBase, fechaIngreso, tipoContrato }, avisos };
+  return {
+    datos: { cedula, nombres, cargo, sueldoBase, fechaIngreso, tipoContrato, regimen, categoriaLoep },
+    avisos,
+  };
 }
 
 const aApi = (fila: Fila) => ({ ...filaACamel(fila), activo: fila.activo === 1 });
@@ -87,8 +106,8 @@ export function rutasEmpleados(db: DatabaseSync): Router {
       const r = ejecutar(
         db,
         `INSERT OR IGNORE INTO empleados (cedula, nombres, cargo, sueldo_base, fecha_ingreso,
-         tipo_contrato) VALUES (?, ?, ?, ?, ?, ?)`,
-        ...e,
+         tipo_contrato, regimen, categoria_loep) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+        e.cedula, e.nombres, e.cargo, e.sueldoBase, e.fechaIngreso, e.tipoContrato, e.regimen, e.categoriaLoep,
       );
       nuevos += Number(r.changes);
     }
@@ -105,10 +124,10 @@ export function rutasEmpleados(db: DatabaseSync): Router {
     guardar(() => {
       const r = ejecutar(
         db,
-        `INSERT INTO empleados (cedula, nombres, cargo, sueldo_base, fecha_ingreso, tipo_contrato)
-         VALUES (?, ?, ?, ?, ?, ?)`,
+        `INSERT INTO empleados (cedula, nombres, cargo, sueldo_base, fecha_ingreso, tipo_contrato,
+         regimen, categoria_loep) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
         datos.cedula, datos.nombres, datos.cargo, datos.sueldoBase, datos.fechaIngreso,
-        datos.tipoContrato,
+        datos.tipoContrato, datos.regimen, datos.categoriaLoep,
       );
       id = Number(r.lastInsertRowid);
     });
@@ -122,9 +141,9 @@ export function rutasEmpleados(db: DatabaseSync): Router {
       ejecutar(
         db,
         `UPDATE empleados SET cedula = ?, nombres = ?, cargo = ?, sueldo_base = ?,
-         fecha_ingreso = ?, tipo_contrato = ? WHERE id = ?`,
+         fecha_ingreso = ?, tipo_contrato = ?, regimen = ?, categoria_loep = ? WHERE id = ?`,
         datos.cedula, datos.nombres, datos.cargo, datos.sueldoBase, datos.fechaIngreso,
-        datos.tipoContrato, actual.id,
+        datos.tipoContrato, datos.regimen, datos.categoriaLoep, actual.id,
       );
     });
     res.json({ ...aApi(buscar(req.params.id)), avisos });
