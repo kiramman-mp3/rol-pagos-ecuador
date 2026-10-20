@@ -12,10 +12,14 @@ export interface Grado {
   grado: number;
   denominacion: string;
   rmu: number;
+  /** tope del rango de mínimos entre ramas (solo referencia); null si el nivel tiene un solo valor */
+  rmuMax: number | null;
+  /** true: la RMU es un mínimo y el sueldo puede ser mayor; false: el sueldo es exactamente la RMU */
+  esMinimo: boolean;
   fuente: string;
 }
 
-const aGrado = (f: Fila): Grado => filaACamel(f) as unknown as Grado;
+const aGrado = (f: Fila): Grado => ({ ...(filaACamel(f) as unknown as Grado), esMinimo: f.es_minimo === 1 });
 
 export function listarEscala(db: DatabaseSync, regimen?: string): Grado[] {
   const filas = regimen
@@ -29,13 +33,7 @@ export function buscarGrado(db: DatabaseSync, id: number): Grado | undefined {
   return fila ? aGrado(fila) : undefined;
 }
 
-interface DatosGrado {
-  regimen: string;
-  grado: number;
-  denominacion: string;
-  rmu: number;
-  fuente: string;
-}
+type DatosGrado = Omit<Grado, "id">;
 
 /** Valida el cuerpo de un grado; reporta todos los problemas juntos. */
 function validarGrado(db: DatabaseSync, cuerpo: Record<string, unknown>): DatosGrado {
@@ -57,8 +55,20 @@ function validarGrado(db: DatabaseSync, cuerpo: Record<string, unknown>): DatosG
   } catch (error) {
     errores.push(`Remuneración: ${(error as Error).message}.`);
   }
+  let rmuMax: number | null = null;
+  if (cuerpo.rmuMax !== null && cuerpo.rmuMax !== undefined && cuerpo.rmuMax !== "") {
+    try {
+      rmuMax = aDecimal(cuerpo.rmuMax).toNumber();
+      if (rmuMax < rmu) errores.push("El tope del rango no puede ser menor a la remuneración.");
+    } catch (error) {
+      errores.push(`Tope del rango: ${(error as Error).message}.`);
+    }
+  }
   if (errores.length) throw new ErrorApi(400, errores);
-  return { regimen, grado, denominacion: denominacion.slice(0, 120), rmu, fuente: String(cuerpo.fuente ?? "").trim().slice(0, 200) };
+  return {
+    regimen, grado, denominacion: denominacion.slice(0, 120), rmu, rmuMax, esMinimo: cuerpo.esMinimo === true,
+    fuente: String(cuerpo.fuente ?? "").trim().slice(0, 200),
+  };
 }
 
 /** Traduce el choque con UNIQUE(régimen, grado) a un 409 legible. */
@@ -79,8 +89,8 @@ export function crearGrado(db: DatabaseSync, cuerpo: Record<string, unknown>): G
     Number(
       ejecutar(
         db,
-        "INSERT INTO escala_salarial (regimen, grado, denominacion, rmu, fuente) VALUES (?, ?, ?, ?, ?)",
-        d.regimen, d.grado, d.denominacion, d.rmu, d.fuente,
+        "INSERT INTO escala_salarial (regimen, grado, denominacion, rmu, rmu_max, es_minimo, fuente) VALUES (?, ?, ?, ?, ?, ?, ?)",
+        d.regimen, d.grado, d.denominacion, d.rmu, d.rmuMax, d.esMinimo ? 1 : 0, d.fuente,
       ).lastInsertRowid,
     ),
   );
@@ -93,8 +103,8 @@ export function actualizarGrado(db: DatabaseSync, id: number, cuerpo: Record<str
   conDuplicados(() =>
     ejecutar(
       db,
-      "UPDATE escala_salarial SET regimen = ?, grado = ?, denominacion = ?, rmu = ?, fuente = ? WHERE id = ?",
-      d.regimen, d.grado, d.denominacion, d.rmu, d.fuente, id,
+      "UPDATE escala_salarial SET regimen = ?, grado = ?, denominacion = ?, rmu = ?, rmu_max = ?, es_minimo = ?, fuente = ? WHERE id = ?",
+      d.regimen, d.grado, d.denominacion, d.rmu, d.rmuMax, d.esMinimo ? 1 : 0, d.fuente, id,
     ),
   );
   return buscarGrado(db, id)!;
