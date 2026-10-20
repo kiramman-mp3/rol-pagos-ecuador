@@ -16,6 +16,7 @@ import { ParametrosLey } from '../core/api';
         </a>
         <nav class="navegacion" aria-label="Principal">
           <a routerLink="/sistema/empleados" routerLinkActive ariaCurrentWhenActive="page">Empleados</a>
+          <a routerLink="/sistema/organico" routerLinkActive ariaCurrentWhenActive="page">Orgánico</a>
           <a routerLink="/sistema/roles" routerLinkActive ariaCurrentWhenActive="page">Roles de pago</a>
           <a routerLink="/sistema/parametros" routerLinkActive ariaCurrentWhenActive="page">Parámetros</a>
         </nav>

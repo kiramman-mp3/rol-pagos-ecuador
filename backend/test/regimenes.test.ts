@@ -122,7 +122,7 @@ describe("empleados y régimen", () => {
       assert.equal(por_defecto.json.categoriaLoep, null);
       const grado = (await api.get("/api/escala?regimen=LOSEP")).json[4];
       const losep = await api.post("/api/empleados", {
-        ...EMPLEADO, cedula: "1702345677", regimen: "LOSEP", sueldoBase: grado.rmu, escalaId: grado.id,
+        ...EMPLEADO, puestoId: null, cedula: "1702345677", regimen: "LOSEP", sueldoBase: grado.rmu, escalaId: grado.id,
       });
       assert.equal(losep.json.regimen, "LOSEP");
     } finally {
@@ -140,7 +140,7 @@ describe("empleados y régimen", () => {
       assert.equal(con.json.categoriaLoep, "obrero");
       const grado = (await api.get("/api/escala?regimen=LOSEP")).json[4];
       const ignorada = await api.post("/api/empleados", {
-        ...EMPLEADO, cedula: "1702345677", regimen: "LOSEP", categoriaLoep: "obrero",
+        ...EMPLEADO, puestoId: null, cedula: "1702345677", regimen: "LOSEP", categoriaLoep: "obrero",
         sueldoBase: grado.rmu, escalaId: grado.id,
       });
       assert.equal(ignorada.json.categoriaLoep, null);

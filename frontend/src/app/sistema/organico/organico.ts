@@ -1,0 +1,242 @@
+import { httpResource } from '@angular/common/http';
+import { Component, computed, inject, signal } from '@angular/core';
+import { firstValueFrom } from 'rxjs';
+
+import { Api, valorSeguro } from '../../core/api';
+import type { DatosPuesto } from '../../core/api';
+import { Avisos } from '../../core/avisos';
+import { DineroPipe } from '../../core/dinero.pipe';
+import type { Grado, Puesto } from '../../core/modelos';
+
+/** Lo que se escribe en el formulario de un puesto. */
+interface Borrador {
+  id: number | null;
+  nombre: string;
+  superiorId: string;
+  funcion: string;
+  responsabilidad: string;
+  sector: string;
+  escalaId: string;
+}
+
+const VACIO: Borrador = { id: null, nombre: '', superiorId: '', funcion: '', responsabilidad: '', sector: '', escalaId: '' };
+
+/** Un puesto con su profundidad en el orgánico, para dibujarlo sangrado bajo su superior. */
+interface Linea {
+  puesto: Puesto;
+  nivel: number;
+}
+
+/**
+ * Orgánico funcional: de quién depende cada puesto, qué función y responsabilidad tiene, en qué
+ * sector económico está y qué nivel de la escala salarial le sirve de referencia.
+ */
+@Component({
+  selector: 'app-organico',
+  imports: [DineroPipe],
+  template: `
+    <div class="encabezado">
+      <h1>Orgánico funcional</h1>
+    </div>
+
+    <section class="hoja" aria-labelledby="titulo-organico">
+      <div class="hoja-titulo">
+        <h2 id="titulo-organico">Puestos de la empresa</h2>
+        <p>
+          Antes de asignar un sueldo se identifica el puesto: su función, su responsabilidad, el sector económico y
+          el nivel de la escala salarial que sirve de referencia. Los niveles de ejemplo salen de una tabla de clase y
+          están <strong>por confirmar</strong>.
+        </p>
+      </div>
+      <div class="hoja-cuerpo">
+        @for (l of lineas(); track l.puesto.id) {
+          <article class="puesto" [style.margin-left.rem]="l.nivel * 1.75" [class.puesto-raiz]="l.nivel === 0">
+            <header>
+              <h3>{{ l.puesto.nombre }}</h3>
+              <span class="apoyo pequeno">
+                {{ l.puesto.empleados }} {{ l.puesto.empleados === 1 ? 'empleado' : 'empleados' }}
+              </span>
+            </header>
+            <dl class="ficha-puesto">
+              <dt>Función</dt><dd>{{ l.puesto.funcion }}</dd>
+              <dt>Responsabilidad</dt><dd>{{ l.puesto.responsabilidad }}</dd>
+              <dt>Sector económico</dt><dd>{{ l.puesto.sector }}</dd>
+              <dt>Referencia salarial</dt>
+              <dd>
+                @if (l.puesto.referencia; as r) {
+                  {{ r.denominacion }}: {{ r.esMinimo ? 'mínimo ' : '' }}{{ r.rmu | dinero }}
+                  @if (r.rmuMax) { <span class="apoyo pequeno">(según la rama, hasta {{ r.rmuMax | dinero }})</span> }
+                } @else {
+                  Sin nivel: elige uno al editar el puesto.
+                }
+              </dd>
+            </dl>
+            <div class="acciones-puesto">
+              <button class="boton-texto" type="button" (click)="editar(l.puesto)">Editar</button>
+              <button class="boton-texto boton-peligro" type="button" (click)="eliminar(l.puesto)">Eliminar</button>
+            </div>
+          </article>
+        } @empty {
+          <p class="tabla-vacia">
+            @if (puestos.isLoading()) { Cargando el orgánico… }
+            @else { Todavía no hay puestos. Agrega el primero con el formulario de abajo. }
+          </p>
+        }
+      </div>
+    </section>
+
+    <section class="hoja" aria-labelledby="titulo-puesto">
+      <div class="hoja-titulo">
+        <h2 id="titulo-puesto">{{ borrador().id === null ? 'Agregar un puesto' : 'Editar «' + borrador().nombre + '»' }}</h2>
+      </div>
+      <div class="hoja-cuerpo">
+        <form class="formulario" (submit)="$event.preventDefault(); guardar()">
+          <div class="campo c3">
+            <label for="puesto-nombre">Nombre del puesto</label>
+            <input class="entrada" id="puesto-nombre" maxlength="100"
+                   [value]="borrador().nombre" (input)="cambiar('nombre', $any($event.target).value)" />
+          </div>
+          <div class="campo c3">
+            <label for="puesto-superior">Depende de</label>
+            <select class="entrada" id="puesto-superior" (change)="cambiar('superiorId', $any($event.target).value)">
+              <option value="" [selected]="borrador().superiorId === ''">Nadie: es la cabeza del orgánico</option>
+              @for (p of posiblesSuperiores(); track p.id) {
+                <option [value]="p.id" [selected]="borrador().superiorId === '' + p.id">{{ p.nombre }}</option>
+              }
+            </select>
+          </div>
+          <div class="campo">
+            <label for="puesto-funcion">Función</label>
+            <textarea class="entrada" id="puesto-funcion" rows="2" maxlength="400"
+                      [value]="borrador().funcion" (input)="cambiar('funcion', $any($event.target).value)"></textarea>
+          </div>
+          <div class="campo">
+            <label for="puesto-responsabilidad">Responsabilidad</label>
+            <textarea class="entrada" id="puesto-responsabilidad" rows="2" maxlength="400"
+                      [value]="borrador().responsabilidad"
+                      (input)="cambiar('responsabilidad', $any($event.target).value)"></textarea>
+          </div>
+          <div class="campo c3">
+            <label for="puesto-sector">Sector económico</label>
+            <input class="entrada" id="puesto-sector" maxlength="120"
+                   [value]="borrador().sector" (input)="cambiar('sector', $any($event.target).value)" />
+            <span class="ayuda">La rama de la comisión sectorial en la que está la empresa.</span>
+          </div>
+          <div class="campo c3">
+            <label for="puesto-escala">Referencia salarial</label>
+            <select class="entrada" id="puesto-escala" (change)="cambiar('escalaId', $any($event.target).value)">
+              <option value="" [selected]="borrador().escalaId === ''">Elige un nivel de la escala</option>
+              @for (g of niveles(); track g.id) {
+                <option [value]="g.id" [selected]="borrador().escalaId === '' + g.id">
+                  {{ g.regimen }} · {{ g.denominacion }} ({{ g.esMinimo ? 'mínimo ' : '' }}{{ g.rmu | dinero }})
+                </option>
+              }
+            </select>
+          </div>
+          <div class="acciones">
+            <button class="boton" [disabled]="guardando()">
+              {{ borrador().id === null ? 'Agregar puesto' : 'Guardar cambios' }}
+            </button>
+            @if (borrador().id !== null) {
+              <button class="boton boton-claro" type="button" (click)="borrador.set(vacio())">Cancelar</button>
+            }
+          </div>
+        </form>
+      </div>
+    </section>
+  `,
+})
+export class Organico {
+  private readonly api = inject(Api);
+  private readonly avisos = inject(Avisos);
+
+  protected readonly puestos = httpResource<Puesto[]>(() => '/api/puestos');
+  private readonly todos = valorSeguro(this.puestos);
+  private readonly escala = valorSeguro(httpResource<Grado[]>(() => '/api/escala'));
+
+  /** Los niveles que un puesto puede tomar como referencia: todos los de la escala. */
+  protected readonly niveles = computed(() => this.escala() ?? []);
+
+  protected readonly borrador = signal<Borrador>(VACIO);
+  protected readonly guardando = signal(false);
+
+  /** El orgánico en orden de lectura: cada puesto seguido de sus subordinados. */
+  protected readonly lineas = computed<Linea[]>(() => {
+    const todos = this.todos() ?? [];
+    const ids = new Set(todos.map((p) => p.id));
+    const hijosDe = (id: number | null) => todos.filter((p) => p.superiorId === id);
+    const resultado: Linea[] = [];
+    const recorrer = (p: Puesto, nivel: number) => {
+      resultado.push({ puesto: p, nivel });
+      hijosDe(p.id).forEach((h) => recorrer(h, nivel + 1));
+    };
+    // Cabezas: sin superior, o con un superior que ya no existe.
+    todos.filter((p) => p.superiorId === null || !ids.has(p.superiorId)).forEach((p) => recorrer(p, 0));
+    return resultado;
+  });
+
+  /** Al editar, un puesto no puede depender de sí mismo ni de sus subordinados. */
+  protected readonly posiblesSuperiores = computed(() => {
+    const id = this.borrador().id;
+    if (id === null) return this.todos() ?? [];
+    const debajo = new Set<number>([id]);
+    for (const l of this.lineas()) {
+      if (l.puesto.superiorId !== null && debajo.has(l.puesto.superiorId)) debajo.add(l.puesto.id);
+    }
+    return (this.todos() ?? []).filter((p) => !debajo.has(p.id));
+  });
+
+  protected vacio(): Borrador {
+    return VACIO;
+  }
+
+  protected cambiar(campo: keyof Borrador, valor: string) {
+    this.borrador.update((b) => ({ ...b, [campo]: valor }));
+  }
+
+  protected editar(p: Puesto) {
+    this.borrador.set({
+      id: p.id, nombre: p.nombre, superiorId: p.superiorId === null ? '' : String(p.superiorId),
+      funcion: p.funcion, responsabilidad: p.responsabilidad, sector: p.sector,
+      escalaId: p.escalaId === null ? '' : String(p.escalaId),
+    });
+    window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
+  }
+
+  protected async eliminar(p: Puesto) {
+    if (!confirm(`¿Eliminar el puesto «${p.nombre}»? Los empleados que lo ocupan conservan su sueldo.`)) return;
+    this.avisos.limpiar();
+    try {
+      await firstValueFrom(this.api.eliminarPuesto(p.id));
+      this.avisos.exito(`Se eliminó el puesto «${p.nombre}».`);
+      this.puestos.reload();
+    } catch (error) {
+      this.avisos.errorHttp(error);
+    }
+  }
+
+  protected async guardar() {
+    this.avisos.limpiar();
+    const b = this.borrador();
+    const datos: DatosPuesto = {
+      nombre: b.nombre,
+      superiorId: b.superiorId === '' ? null : Number(b.superiorId),
+      funcion: b.funcion,
+      responsabilidad: b.responsabilidad,
+      sector: b.sector,
+      escalaId: b.escalaId === '' ? null : Number(b.escalaId),
+    };
+    this.guardando.set(true);
+    try {
+      await firstValueFrom(b.id === null ? this.api.crearPuesto(datos) : this.api.editarPuesto(b.id, datos));
+      this.avisos.exito(b.id === null ? 'Se agregó el puesto.' : 'Se guardaron los cambios del puesto.');
+      this.borrador.set(VACIO);
+      this.puestos.reload();
+    } catch (error) {
+      this.avisos.errorHttp(error);
+      window.scrollTo({ top: 0 });
+    } finally {
+      this.guardando.set(false);
+    }
+  }
+}

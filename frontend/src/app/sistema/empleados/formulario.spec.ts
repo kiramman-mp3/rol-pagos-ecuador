@@ -3,7 +3,7 @@ import { HttpTestingController, provideHttpClientTesting } from '@angular/common
 import { TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
 
-import type { Grado } from '../../core/modelos';
+import type { Grado, Puesto } from '../../core/modelos';
 import { FormularioEmpleado } from './formulario';
 
 const PARAMETROS = {
@@ -20,6 +20,10 @@ const GRADOS: Grado[] = [
   { id: 12, regimen: 'LOSEP', grado: 7, denominacion: 'Servidor Público 1', rmu: 817, rmuMax: null, esMinimo: false, fuente: '' },
 ];
 const NIVEL_MINIMO: Grado = { id: 21, regimen: 'CODIGO_TRABAJO', grado: 2, denominacion: 'B1: Supervisión general', rmu: 495, rmuMax: 842, esMinimo: true, fuente: '' };
+const PUESTO: Puesto = {
+  id: 31, nombre: 'Administrador / Contador', superiorId: null, funcion: 'Administrar los recursos.',
+  responsabilidad: 'Responde ante el gerente.', sector: 'Servicios', escalaId: 21, referencia: NIVEL_MINIMO, empleados: 0,
+};
 const GRADO_CODIGO: Grado = { id: 13, regimen: 'CODIGO_TRABAJO', grado: 1, denominacion: 'Operario', rmu: 500, rmuMax: null, esMinimo: false, fuente: '' };
 
 describe('FormularioEmpleado', () => {
@@ -32,7 +36,7 @@ describe('FormularioEmpleado', () => {
     http = TestBed.inject(HttpTestingController);
   });
 
-  const abrir = async (grados = GRADOS) => {
+  const abrir = async (grados = GRADOS, puestos: Puesto[] = []) => {
     const fixture = TestBed.createComponent(FormularioEmpleado);
     fixture.detectChanges();
     TestBed.tick();
@@ -44,6 +48,7 @@ describe('FormularioEmpleado', () => {
       ],
     });
     http.expectOne('/api/escala').flush(grados);
+    http.expectOne('/api/puestos').flush(puestos);
     await fixture.whenStable();
     fixture.detectChanges();
     return { fixture, el: fixture.nativeElement as HTMLElement };
@@ -192,6 +197,46 @@ describe('FormularioEmpleado', () => {
     const cuerpo = http.expectOne('/api/empleados').request.body;
     expect(cuerpo.sueldoBase).toBe(900);
     expect(cuerpo.escalaId).toBe(21);
+  });
+
+  it('con puestos, primero se elige el puesto: muestra su ficha y fija el nivel, el sueldo y el cargo', async () => {
+    const { fixture, el } = await abrir([...GRADOS, NIVEL_MINIMO], [PUESTO]);
+    expect(el.querySelector('#puestoId')).not.toBeNull();
+    expect(el.querySelector('#escalaId')).toBeNull(); // el grado sale del puesto
+
+    escribir(el, 'puestoId', '31', 'change');
+    fixture.detectChanges();
+    expect(el.querySelector('.ficha-puesto')!.textContent).toContain('Administrar los recursos.');
+    expect(el.querySelector('.ficha-puesto')!.textContent).toContain('Servicios');
+    expect(el.querySelector('.ficha-puesto')!.textContent).toContain('B1: Supervisión general');
+    expect(el.querySelector<HTMLInputElement>('#sueldoBase')!.value).toBe('495');
+    expect(el.querySelector<HTMLInputElement>('#cargo')!.value).toBe('Administrador / Contador');
+  });
+
+  it('con puestos, no se guarda sin puesto y se envía el puesto y su grado', async () => {
+    const { fixture, el } = await abrir([...GRADOS, NIVEL_MINIMO], [PUESTO]);
+    escribir(el, 'cedula', '1801234566');
+    escribir(el, 'nombres', 'Ana Prueba');
+    escribir(el, 'fechaIngreso', '2024-01-10');
+    el.querySelector('form')!.dispatchEvent(new Event('submit'));
+    http.expectNone('/api/empleados'); // falta el puesto
+
+    escribir(el, 'puestoId', '31', 'change');
+    fixture.detectChanges();
+    escribir(el, 'sueldoBase', '800');
+    el.querySelector('form')!.dispatchEvent(new Event('submit'));
+    const cuerpo = http.expectOne('/api/empleados').request.body;
+    expect(cuerpo.puestoId).toBe(31);
+    expect(cuerpo.escalaId).toBe(21);
+    expect(cuerpo.sueldoBase).toBe(800);
+  });
+
+  it('un régimen sin puestos no pide puesto y envía el puesto en nulo', async () => {
+    const { fixture, el } = await abrir([...GRADOS, NIVEL_MINIMO], [PUESTO]);
+    escribir(el, 'regimen', 'LOSEP', 'change');
+    fixture.detectChanges();
+    expect(el.querySelector('#puestoId')).toBeNull();
+    expect(el.querySelector('#escalaId')).not.toBeNull();
   });
 
   it('un cargo ya escrito no se pisa al elegir el grado', async () => {
