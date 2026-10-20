@@ -12,7 +12,10 @@ class Vacio {}
 const SIN_NOVEDADES = { horasSuplementarias: 0, horasExtraordinarias: 0, horasDescanso: 0, horasNocturnas: 0, comisiones: 0, otrosDescuentos: 0 };
 const PERIODO = {
   anio: 2026, mes: 10, existe: true,
-  empleados: [{ id: 1, nombres: 'Ana Prueba', cargo: 'Analista', sueldoBase: 1000, novedades: SIN_NOVEDADES }],
+  empleados: [{
+    id: 1, nombres: 'Ana Prueba', cargo: 'Analista', sueldoBase: 1000,
+    regimen: 'CODIGO_TRABAJO', regimenAplicado: 'CODIGO_TRABAJO', novedades: SIN_NOVEDADES,
+  }],
 };
 
 describe('NovedadesMes', () => {
@@ -36,7 +39,7 @@ describe('NovedadesMes', () => {
     fixture.detectChanges();
     TestBed.tick();
 
-    http.expectOne('/api/parametros').flush({ meses: ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'] });
+    http.expectOne('/api/parametros').flush({ regimenes: [], meses: ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'] });
     http.expectOne('/api/roles/periodo/2026/10').flush(PERIODO);
     await fixture.whenStable();
     fixture.detectChanges();
@@ -68,7 +71,7 @@ describe('NovedadesMes', () => {
     fixture.componentRef.setInput('mes', '10');
     fixture.detectChanges();
     TestBed.tick();
-    http.expectOne('/api/parametros').flush({ meses: [] });
+    http.expectOne('/api/parametros').flush({ regimenes: [], meses: [] });
     http.expectOne('/api/roles/periodo/2026/10').flush({ ...PERIODO, existe: false });
     await fixture.whenStable();
     fixture.detectChanges();

@@ -3,7 +3,7 @@ import { Component, inject } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { firstValueFrom } from 'rxjs';
 
-import { Api, valorSeguro } from '../../core/api';
+import { Api, ParametrosLey, valorSeguro } from '../../core/api';
 import { Avisos } from '../../core/avisos';
 import { DineroPipe } from '../../core/dinero.pipe';
 import type { Empleado } from '../../core/modelos';
@@ -34,6 +34,7 @@ import type { Empleado } from '../../core/modelos';
             <tr>
               <th>Empleado</th>
               <th>Cargo</th>
+              <th>Régimen</th>
               <th>Contrato</th>
               <th>Ingreso</th>
               <th class="num">Sueldo base</th>
@@ -46,6 +47,10 @@ import type { Empleado } from '../../core/modelos';
               <tr [class.fila-inactiva]="!e.activo">
                 <td>{{ e.nombres }}<span class="secundario">{{ e.cedula }}</span></td>
                 <td>{{ e.cargo }}</td>
+                <td>
+                  {{ nombreRegimen(e.regimen) }}
+                  @if (e.categoriaLoep) { <span class="secundario">{{ e.categoriaLoep === 'obrero' ? 'Obrero' : 'Servidor' }}</span> }
+                </td>
                 <td>{{ e.tipoContrato }}</td>
                 <td>{{ e.fechaIngreso }}</td>
                 <td class="num">{{ e.sueldoBase | dinero }}</td>
@@ -64,7 +69,7 @@ import type { Empleado } from '../../core/modelos';
               </tr>
             } @empty {
               <tr>
-                <td colspan="7" class="tabla-vacia">
+                <td colspan="8" class="tabla-vacia">
                   @if (empleados.isLoading()) {
                     Cargando empleados…
                   } @else if (empleados.error()) {
@@ -85,8 +90,13 @@ import type { Empleado } from '../../core/modelos';
 export class ListaEmpleados {
   private readonly api = inject(Api);
   private readonly avisos = inject(Avisos);
+  private readonly parametros = inject(ParametrosLey).valor;
   protected readonly empleados = httpResource<Empleado[]>(() => '/api/empleados');
   protected readonly lista = valorSeguro(this.empleados);
+
+  protected nombreRegimen(codigo: string): string {
+    return this.parametros()?.regimenes.find((r) => r.codigo === codigo)?.nombre ?? codigo;
+  }
 
   protected async cargarDemo() {
     await this.ejecutar(async () => {

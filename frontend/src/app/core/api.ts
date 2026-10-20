@@ -6,7 +6,7 @@ import type {
   Empleado,
   EntradaSimulacion,
   Parametros,
-  ResultadoRol,
+  ResultadoSimulacion,
 } from './modelos';
 
 /** Lo que se digita en la grilla: texto de los campos, vacío = 0. */
@@ -64,7 +64,7 @@ export class Api {
   }
 
   simular(entrada: EntradaSimulacion) {
-    return this.http.post<ResultadoRol>('/api/simulacion', entrada);
+    return this.http.post<ResultadoSimulacion>('/api/simulacion', entrada);
   }
 }
 

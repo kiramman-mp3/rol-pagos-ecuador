@@ -1,4 +1,5 @@
 import { httpResource } from '@angular/common/http';
+import { PercentPipe } from '@angular/common';
 import { Component, computed, effect, inject, input, signal } from '@angular/core';
 import { Router, RouterLink } from '@angular/router';
 import { firstValueFrom } from 'rxjs';
@@ -8,6 +9,7 @@ import type { NovedadEnviada } from '../../core/api';
 import { Avisos } from '../../core/avisos';
 import { DineroPipe } from '../../core/dinero.pipe';
 import type { Periodo } from '../../core/modelos';
+import { etiquetaRegimen } from '../../core/regimen';
 
 type Campo = Exclude<keyof NovedadEnviada, 'empleadoId'>;
 
@@ -15,6 +17,8 @@ interface Fila extends NovedadEnviada {
   nombres: string;
   cargo: string;
   sueldoBase: number;
+  regimen: string;
+  regimenAplicado: string;
 }
 
 const COLUMNAS: { campo: Campo; etiqueta: string; corte?: boolean }[] = [
@@ -29,7 +33,7 @@ const COLUMNAS: { campo: Campo; etiqueta: string; corte?: boolean }[] = [
 /** Grilla para digitar horas extras, comisiones y anticipos antes de generar el rol. */
 @Component({
   selector: 'app-novedades-mes',
-  imports: [RouterLink, DineroPipe],
+  imports: [RouterLink, DineroPipe, PercentPipe],
   template: `
     <div class="encabezado">
       <div>
@@ -76,7 +80,10 @@ const COLUMNAS: { campo: Campo; etiqueta: string; corte?: boolean }[] = [
                 <tbody>
                   @for (f of filas(); track f.empleadoId; let i = $index) {
                     <tr>
-                      <td>{{ f.nombres }}<span class="secundario">{{ f.cargo }}</span></td>
+                      <td>
+                        {{ f.nombres }}
+                        <span class="secundario">{{ f.cargo }} · {{ regimen(f) }}</span>
+                      </td>
                       <td class="num">{{ f.sueldoBase | dinero }}</td>
                       @for (c of columnas; track c.campo) {
                         <td [class.corte]="c.corte">
@@ -110,6 +117,18 @@ const COLUMNAS: { campo: Campo; etiqueta: string; corte?: boolean }[] = [
               24h00; las extraordinarias van de 24h00 a 06h00 en días hábiles; las de sábado, domingo y feriado tienen
               su propio recargo. En las nocturnas solo se suma el recargo, porque la hora ya está dentro del sueldo.
             </p>
+            <ul class="sin-vinetas">
+              @for (r of reglasPropias(); track r.codigo) {
+                <li>
+                  <strong>{{ r.nombre }}:</strong>
+                  suplementarias {{ r.recargoSuplementarias | percent: '1.0-0' }},
+                  extraordinarias {{ r.recargoExtraordinarias | percent: '1.0-0' }},
+                  sábado, domingo y feriado {{ r.recargoDescanso | percent: '1.0-0' }},
+                  nocturnas {{ r.recargoNocturno | percent: '1.0-0' }}
+                  @if (r.topeSuplementariasMes !== null) { (tope de {{ r.topeSuplementariasMes }} suplementarias al mes) }.
+                </li>
+              }
+            </ul>
             <p style="margin: 0">Quien ingresó durante el mes cobra solo los días trabajados.</p>
           </div>
         </div>
@@ -137,6 +156,9 @@ export class NovedadesMes {
   protected readonly filas = signal<Fila[]>([]);
   protected readonly generando = signal(false);
   protected readonly nombreMes = computed(() => this.parametros()?.meses[Number(this.mes()) - 1] ?? '');
+  protected readonly reglasPropias = computed(
+    () => this.parametros()?.regimenes.filter((r) => r.tipo === 'reglas') ?? [],
+  );
 
   protected readonly periodo = httpResource<Periodo>(
     () => `/api/roles/periodo/${this.anio()}/${this.mes()}`,
@@ -155,6 +177,8 @@ export class NovedadesMes {
           nombres: e.nombres,
           cargo: e.cargo,
           sueldoBase: e.sueldoBase,
+          regimen: e.regimen,
+          regimenAplicado: e.regimenAplicado,
           horasSuplementarias: texto(e.novedades.horasSuplementarias),
           horasExtraordinarias: texto(e.novedades.horasExtraordinarias),
           horasDescanso: texto(e.novedades.horasDescanso),
@@ -164,6 +188,10 @@ export class NovedadesMes {
         })),
       );
     });
+  }
+
+  protected regimen(f: Fila): string {
+    return etiquetaRegimen(this.parametros()?.regimenes, f.regimen, f.regimenAplicado);
   }
 
   protected cambiar(indice: number, campo: Campo, valor: string) {

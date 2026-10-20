@@ -1,12 +1,14 @@
 import { Router } from "express";
 import type { DatabaseSync } from "node:sqlite";
 
-import { calcularRol, REGLAS_CT_2026 } from "../calculos.ts";
+import { calcularRol } from "../calculos.ts";
 import { CONTRATOS, EMPRESA, MESES } from "../config.ts";
 import {
   aniosConParametros, guardarParametros, parametrosDelAnio, validarTablaIr,
 } from "../parametros.ts";
-import { reglasDe } from "../reglas.ts";
+import {
+  buscarRegimen, CATEGORIAS_LOEP, indexarRegimenes, listarRegimenes, regimenAplicado, reglasDe,
+} from "../regimenes.ts";
 import { aDecimal, ErrorApi } from "../validaciones.ts";
 
 export function rutasParametros(db: DatabaseSync): Router {
@@ -16,6 +18,7 @@ export function rutasParametros(db: DatabaseSync): Router {
   router.get("/parametros", (req, res) => {
     const pedido = Number(req.query.anio ?? new Date().getFullYear());
     const { parametros, exacto } = parametrosDelAnio(db, Number.isInteger(pedido) ? pedido : new Date().getFullYear());
+    const ct = buscarRegimen(db, "CODIGO_TRABAJO");
     res.json({
       anio: parametros.anio,
       anioSolicitado: pedido,
@@ -23,9 +26,12 @@ export function rutasParametros(db: DatabaseSync): Router {
       anios: aniosConParametros(db),
       sbu: parametros.sbu,
       fuente: parametros.fuente,
-      iessPersonal: Number(REGLAS_CT_2026.iessPersonal),
-      iessPatronal: Number(REGLAS_CT_2026.iessPatronal),
-      fondosReserva: Number(REGLAS_CT_2026.fondosReserva),
+      // Resumen del Código del Trabajo; el detalle por régimen está en `regimenes`.
+      iessPersonal: ct?.iessPersonal ?? 0,
+      iessPatronal: ct?.iessPatronal ?? 0,
+      fondosReserva: ct?.fondosReserva ?? 0,
+      regimenes: listarRegimenes(db),
+      categoriasLoep: CATEGORIAS_LOEP,
       fraccionExentaIr: parametros.tablaIr[0].hasta,
       tablaIr: parametros.tablaIr,
       empresa: EMPRESA,
@@ -74,14 +80,21 @@ export function rutasParametros(db: DatabaseSync): Router {
     const horasSuplementarias = campo("horasSuplementarias", 0, 100, "Horas suplementarias");
     const horasExtraordinarias = campo("horasExtraordinarias", 0, 100, "Horas extraordinarias");
     const comisiones = campo("comisiones", 0, 100000, "Comisiones");
+    const regimenes = indexarRegimenes(listarRegimenes(db));
+    const aplicado = regimenAplicado(
+      regimenes, String(cuerpo.regimen ?? "CODIGO_TRABAJO"), cuerpo.categoriaLoep ? String(cuerpo.categoriaLoep) : null,
+    );
     if (errores.length) throw new ErrorApi(400, errores);
 
-    res.json(
-      calcularRol({
+    res.json({
+      ...calcularRol({
         sueldoBase, horasSuplementarias, horasExtraordinarias, comisiones,
         fechaIngreso: "2020-01-01", anio: 2026, mes: 10,
-      }, reglasDe(parametrosDelAnio(db, 2026).parametros)),
-    );
+      }, reglasDe(parametrosDelAnio(db, 2026).parametros, aplicado)),
+      regimenAplicado: aplicado.nombre,
+      tasaIessPersonal: aplicado.iessPersonal,
+      tasaIessPatronal: aplicado.iessPatronal,
+    });
   });
 
   return router;

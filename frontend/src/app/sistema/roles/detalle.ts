@@ -1,4 +1,5 @@
 import { httpResource } from '@angular/common/http';
+import { PercentPipe } from '@angular/common';
 import { Component, computed, inject, input } from '@angular/core';
 import { Router, RouterLink } from '@angular/router';
 import { firstValueFrom } from 'rxjs';
@@ -6,11 +7,12 @@ import { firstValueFrom } from 'rxjs';
 import { Api, ParametrosLey, valorSeguro } from '../../core/api';
 import { Avisos } from '../../core/avisos';
 import { DineroPipe, sumar } from '../../core/dinero.pipe';
+import { etiquetaRegimen } from '../../core/regimen';
 import type { RolCompleto, RolDetalle } from '../../core/modelos';
 
 @Component({
   selector: 'app-detalle-rol',
-  imports: [RouterLink, DineroPipe],
+  imports: [RouterLink, DineroPipe, PercentPipe],
   template: `
     @if (datos(); as r) {
       <div class="encabezado">
@@ -83,7 +85,7 @@ import type { RolCompleto, RolDetalle } from '../../core/modelos';
                 <th class="num">Horas extra</th>
                 <th class="num">Comisiones</th>
                 <th class="num">Total</th>
-                <th class="num corte">IESS 9.45%</th>
+                <th class="num corte">Aporte IESS</th>
                 <th class="num">Impuesto a la renta</th>
                 <th class="num">Otros</th>
                 <th class="num">Total</th>
@@ -97,12 +99,16 @@ import type { RolCompleto, RolDetalle } from '../../core/modelos';
                     <span class="secundario">
                       {{ d.cargo }}@if (d.diasTrabajados < 30) {, {{ d.diasTrabajados }} días trabajados}
                     </span>
+                    <span class="secundario">{{ regimen(d) }}</span>
                   </td>
                   <td class="num corte">{{ d.sueldo | dinero }}</td>
                   <td class="num">{{ horasExtra(d) | dinero }}</td>
                   <td class="num">{{ d.comisiones | dinero }}</td>
                   <td class="num"><strong>{{ d.totalIngresos | dinero }}</strong></td>
-                  <td class="num corte">{{ d.aporteIess | dinero }}</td>
+                  <td class="num corte">
+                    {{ d.aporteIess | dinero }}
+                    <span class="secundario">{{ d.tasaIessPersonal | percent: '1.2-2' }}</span>
+                  </td>
                   <td class="num">{{ d.impuestoRenta | dinero }}</td>
                   <td class="num">{{ d.otrosDescuentos | dinero }}</td>
                   <td class="num"><strong>{{ d.totalDescuentos | dinero }}</strong></td>
@@ -142,7 +148,7 @@ import type { RolCompleto, RolDetalle } from '../../core/modelos';
                 <th class="num g-provision">Décimo cuarto</th>
                 <th class="num g-provision">Vacaciones</th>
                 <th class="num g-provision">Fondos de reserva</th>
-                <th class="num g-provision">Aporte patronal 11.15%</th>
+                <th class="num g-provision">Aporte patronal</th>
                 <th class="num g-provision">Total provisiones</th>
                 <th class="num">Costo empleador</th>
               </tr>
@@ -161,7 +167,10 @@ import type { RolCompleto, RolDetalle } from '../../core/modelos';
                       <span class="apoyo" title="Se generan desde el mes 13 de trabajo">Aún no aplica</span>
                     }
                   </td>
-                  <td class="num">{{ d.aportePatronal | dinero }}</td>
+                  <td class="num">
+                    {{ d.aportePatronal | dinero }}
+                    <span class="secundario">{{ d.tasaIessPatronal | percent: '1.2-2' }}</span>
+                  </td>
                   <td class="num"><strong>{{ d.totalProvisiones | dinero }}</strong></td>
                   <td class="num"><strong>{{ d.costoEmpleador | dinero }}</strong></td>
                 </tr>
@@ -228,6 +237,10 @@ export class DetalleRol {
       patronal: suma((x) => x.aportePatronal),
     };
   });
+
+  protected regimen(d: RolDetalle): string {
+    return etiquetaRegimen(this.parametros()?.regimenes, d.regimen, d.regimenAplicado);
+  }
 
   protected horasExtra(d: RolDetalle): number {
     return sumar([
