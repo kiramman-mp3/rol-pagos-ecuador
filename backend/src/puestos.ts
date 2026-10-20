@@ -19,14 +19,28 @@ export interface Puesto {
   referencia: Grado | null;
   /** cuántos empleados ocupan el puesto */
   empleados: number;
+  /** quién encabeza el puesto, si se le asignó un responsable */
+  responsable: Persona | null;
+  /** los empleados activos que ocupan el puesto: de ellos sale el responsable */
+  ocupantes: Persona[];
+}
+
+export interface Persona {
+  id: number;
+  nombres: string;
 }
 
 const aPuesto = (db: DatabaseSync, f: Fila): Puesto => {
-  const base = filaACamel(f) as unknown as Puesto;
+  const { responsableId, ...base } = filaACamel(f) as unknown as Puesto & { responsableId: number | null };
+  const ocupantes = consultar(
+    db, "SELECT id, nombres FROM empleados WHERE puesto_id = ? AND activo = 1 ORDER BY nombres", f.id,
+  ).map((o) => ({ id: Number(o.id), nombres: String(o.nombres) }));
   return {
     ...base,
     referencia: base.escalaId === null ? null : (buscarGrado(db, base.escalaId) ?? null),
     empleados: Number(uno(db, "SELECT COUNT(*) AS n FROM empleados WHERE puesto_id = ?", f.id)?.n ?? 0),
+    responsable: ocupantes.find((o) => o.id === responsableId) ?? null,
+    ocupantes,
   };
 };
 
@@ -140,4 +154,25 @@ export function actualizarPuesto(db: DatabaseSync, id: number, cuerpo: Record<st
 export function eliminarPuesto(db: DatabaseSync, id: number) {
   if (!buscarPuesto(db, id)) throw new ErrorApi(404, ["El puesto no existe."]);
   ejecutar(db, "DELETE FROM puestos WHERE id = ?", id);
+}
+
+/** Pone o quita (`null`) al responsable de un puesto. Solo puede serlo un empleado activo que lo ocupa. */
+export function asignarResponsable(db: DatabaseSync, id: number, empleadoId: unknown): Puesto {
+  if (!buscarPuesto(db, id)) throw new ErrorApi(404, ["El puesto no existe."]);
+  if (empleadoId === null || empleadoId === undefined || empleadoId === "") {
+    ejecutar(db, "UPDATE puestos SET responsable_id = NULL WHERE id = ?", id);
+  } else {
+    const empleado = uno(db, "SELECT id, nombres, activo, puesto_id FROM empleados WHERE id = ?", Number(empleadoId));
+    if (!empleado) throw new ErrorApi(400, ["El empleado no existe."]);
+    if (empleado.puesto_id !== id || empleado.activo !== 1) {
+      throw new ErrorApi(400, [`${empleado.nombres} no puede ser responsable: debe ser un empleado activo que ocupe este puesto.`]);
+    }
+    ejecutar(db, "UPDATE puestos SET responsable_id = ? WHERE id = ?", empleado.id, id);
+  }
+  return buscarPuesto(db, id)!;
+}
+
+/** Quita a un empleado como responsable de cualquier puesto que ya no ocupa (o de todos si queda inactivo). */
+export function soltarResponsable(db: DatabaseSync, empleadoId: number, puestoQueOcupa: number | null) {
+  ejecutar(db, "UPDATE puestos SET responsable_id = NULL WHERE responsable_id = ? AND id IS NOT ?", empleadoId, puestoQueOcupa);
 }

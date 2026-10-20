@@ -9,7 +9,7 @@ import { consultar, ejecutar, filaACamel, uno } from "../db.ts";
 import type { Fila } from "../db.ts";
 import { parametrosDelAnio } from "../parametros.ts";
 import { buscarGrado, listarEscala } from "../escala.ts";
-import { buscarPuesto, listarPuestos } from "../puestos.ts";
+import { buscarPuesto, listarPuestos, soltarResponsable } from "../puestos.ts";
 import { CATEGORIAS_LOEP, indexarRegimenes, listarRegimenes, regimenAplicado } from "../regimenes.ts";
 import { aDecimal, cedulaValida, ErrorApi, fechaIsoValida } from "../validaciones.ts";
 
@@ -233,6 +233,7 @@ export function rutasEmpleados(db: DatabaseSync): Router {
         datos.pagoDecimoTercero, datos.pagoDecimoCuarto, datos.pagoFondosReserva,
         datos.recibeHorasExtras === null ? null : Number(datos.recibeHorasExtras), actual.id,
       );
+      soltarResponsable(db, Number(actual.id), datos.puestoId); // si cambió de puesto, ya no lo encabeza
     });
     res.json({ ...aApi(buscar(req.params.id)), avisos });
   });
@@ -240,6 +241,7 @@ export function rutasEmpleados(db: DatabaseSync): Router {
   router.patch("/:id/estado", (req, res) => {
     const actual = buscar(req.params.id);
     ejecutar(db, "UPDATE empleados SET activo = 1 - activo WHERE id = ?", actual.id);
+    if (actual.activo === 1) soltarResponsable(db, Number(actual.id), null); // quien se desactiva deja de ser responsable
     res.json(aApi(buscar(req.params.id)));
   });
 

@@ -6,7 +6,7 @@ export interface Cliente {
   get: (ruta: string) => Promise<Respuesta>;
   post: (ruta: string, cuerpo?: unknown) => Promise<Respuesta>;
   put: (ruta: string, cuerpo?: unknown) => Promise<Respuesta>;
-  patch: (ruta: string) => Promise<Respuesta>;
+  patch: (ruta: string, cuerpo?: unknown) => Promise<Respuesta>;
   del: (ruta: string) => Promise<Respuesta>;
   cerrar: () => void;
 }
@@ -47,7 +47,7 @@ export async function iniciar(): Promise<Cliente> {
     get: (ruta) => pedir("GET", ruta),
     post: (ruta, cuerpo = {}) => pedir("POST", ruta, cuerpo),
     put: (ruta, cuerpo = {}) => pedir("PUT", ruta, cuerpo),
-    patch: (ruta) => pedir("PATCH", ruta),
+    patch: (ruta, cuerpo) => pedir("PATCH", ruta, cuerpo),
     del: (ruta) => pedir("DELETE", ruta),
     cerrar: () => {
       servidor.close();

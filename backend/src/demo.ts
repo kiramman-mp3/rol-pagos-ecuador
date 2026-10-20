@@ -7,7 +7,7 @@ import { ejecutar } from "./db.ts";
 import { empleadosDelPeriodo, guardarRol } from "./rutas/roles.ts";
 import type { Novedad } from "./rutas/roles.ts";
 
-/** Inserta los empleados de ejemplo que falten (por cédula) con su puesto y su grado. Devuelve cuántos agregó. */
+/** Inserta los empleados de ejemplo que falten (por cédula) con su puesto y su grado, y deja a cada puesto su responsable. Devuelve cuántos agregó. */
 export function cargarEmpleadosDemo(db: DatabaseSync): number {
   let nuevos = 0;
   for (const e of EMPLEADOS_DEMO) {
@@ -22,6 +22,14 @@ export function cargarEmpleadosDemo(db: DatabaseSync): number {
       e.escalaRegimen, e.escalaGrado, e.puesto,
     );
     nuevos += Number(r.changes);
+    if (e.puesto && e.responsable) {
+      ejecutar(
+        db,
+        `UPDATE puestos SET responsable_id = (SELECT id FROM empleados WHERE cedula = ?)
+         WHERE nombre = ? AND responsable_id IS NULL`,
+        e.cedula, e.puesto,
+      );
+    }
   }
   return nuevos;
 }
