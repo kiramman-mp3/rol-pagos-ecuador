@@ -34,6 +34,10 @@ export interface Grado {
   grado: number;
   denominacion: string;
   rmu: number;
+  /** Tope del rango de mínimos entre ramas (solo referencia); null si hay un solo valor */
+  rmuMax: number | null;
+  /** true: la remuneración es un mínimo y el sueldo puede ser mayor; false: el sueldo es exactamente ella */
+  esMinimo: boolean;
   fuente: string;
 }
 

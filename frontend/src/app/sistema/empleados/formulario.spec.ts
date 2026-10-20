@@ -3,6 +3,7 @@ import { HttpTestingController, provideHttpClientTesting } from '@angular/common
 import { TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
 
+import type { Grado } from '../../core/modelos';
 import { FormularioEmpleado } from './formulario';
 
 const PARAMETROS = {
@@ -14,11 +15,12 @@ const PARAMETROS = {
   ],
 };
 
-const GRADOS = [
-  { id: 11, regimen: 'LOSEP', grado: 5, denominacion: 'Servidor Público de Apoyo 3', rmu: 675, fuente: '' },
-  { id: 12, regimen: 'LOSEP', grado: 7, denominacion: 'Servidor Público 1', rmu: 817, fuente: '' },
+const GRADOS: Grado[] = [
+  { id: 11, regimen: 'LOSEP', grado: 5, denominacion: 'Servidor Público de Apoyo 3', rmu: 675, rmuMax: null, esMinimo: false, fuente: '' },
+  { id: 12, regimen: 'LOSEP', grado: 7, denominacion: 'Servidor Público 1', rmu: 817, rmuMax: null, esMinimo: false, fuente: '' },
 ];
-const GRADO_CODIGO = { id: 13, regimen: 'CODIGO_TRABAJO', grado: 1, denominacion: 'Operario', rmu: 500, fuente: '' };
+const NIVEL_MINIMO: Grado = { id: 21, regimen: 'CODIGO_TRABAJO', grado: 2, denominacion: 'B1: Supervisión general', rmu: 495, rmuMax: 842, esMinimo: true, fuente: '' };
+const GRADO_CODIGO: Grado = { id: 13, regimen: 'CODIGO_TRABAJO', grado: 1, denominacion: 'Operario', rmu: 500, rmuMax: null, esMinimo: false, fuente: '' };
 
 describe('FormularioEmpleado', () => {
   let http: HttpTestingController;
@@ -169,6 +171,27 @@ describe('FormularioEmpleado', () => {
     const { el } = await abrir();
     expect(el.querySelector('#escalaId')).toBeNull();
     expect(el.querySelector<HTMLInputElement>('#sueldoBase')!.readOnly).toBe(false);
+  });
+
+  it('en un nivel de mínimo el sueldo se propone, se puede subir y no se puede bajar', async () => {
+    const { fixture, el } = await abrir([...GRADOS, NIVEL_MINIMO]);
+    llenarBase(el);
+    escribir(el, 'escalaId', '21', 'change');
+    fixture.detectChanges();
+    const sueldo = el.querySelector<HTMLInputElement>('#sueldoBase')!;
+    expect(sueldo.value).toBe('495');
+    expect(sueldo.readOnly).toBe(false);
+    expect(el.textContent).toContain('no puede ser menor a');
+
+    escribir(el, 'sueldoBase', '400');
+    el.querySelector('form')!.dispatchEvent(new Event('submit'));
+    http.expectNone('/api/empleados');
+
+    escribir(el, 'sueldoBase', '900');
+    el.querySelector('form')!.dispatchEvent(new Event('submit'));
+    const cuerpo = http.expectOne('/api/empleados').request.body;
+    expect(cuerpo.sueldoBase).toBe(900);
+    expect(cuerpo.escalaId).toBe(21);
   });
 
   it('un cargo ya escrito no se pisa al elegir el grado', async () => {
