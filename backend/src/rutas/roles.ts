@@ -18,7 +18,7 @@ const CAMPOS_NOVEDAD = [
   "horasSuplementarias", "horasExtraordinarias", "horasDescanso", "horasNocturnas",
   "comisiones", "otrosDescuentos",
 ] as const;
-type Novedad = Record<(typeof CAMPOS_NOVEDAD)[number], Decimal>;
+export type Novedad = Record<(typeof CAMPOS_NOVEDAD)[number], Decimal>;
 const COLUMNAS_NOVEDAD = CAMPOS_NOVEDAD.map(aSnake);
 
 function leerPeriodo(anioTexto: unknown, mesTexto: unknown): { anio: number; mes: number } {
@@ -31,7 +31,7 @@ function leerPeriodo(anioTexto: unknown, mesTexto: unknown): { anio: number; mes
 }
 
 /** Activos que ya habían ingresado al cierre del mes (las fechas ISO se comparan como texto). */
-function empleadosDelPeriodo(db: DatabaseSync, anio: number, mes: number): Fila[] {
+export function empleadosDelPeriodo(db: DatabaseSync, anio: number, mes: number): Fila[] {
   return consultar(
     db,
     "SELECT * FROM empleados WHERE activo = 1 AND fecha_ingreso <= ? ORDER BY nombres",
@@ -43,7 +43,7 @@ const existeRol = (db: DatabaseSync, anio: number, mes: number) =>
   uno(db, "SELECT 1 AS ok FROM roles_cabecera WHERE anio = ? AND mes = ?", anio, mes) !== undefined;
 
 /** Calcula y guarda todo en una sola transacción; reemplaza el rol del mes si existía. */
-function guardarRol(
+export function guardarRol(
   db: DatabaseSync, anio: number, mes: number,
   empleados: Fila[], novedades: Map<number, Novedad>,
 ): { rolId: number; avisos: string[] } {

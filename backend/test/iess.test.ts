@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
 import { planillaIess } from "../src/iess.ts";
-import { iniciar } from "./ayuda.ts";
+import { iniciar, cargarEmpleadosDePrueba } from "./ayuda.ts";
 import type { Cliente } from "./ayuda.ts";
 
 /** Fila de roles_detalle con solo lo que usa la planilla. */
@@ -56,7 +56,7 @@ describe("planillaIess: cuadro para contrastar con el comprobante del IESS", () 
 async function conRol(prueba: (api: Cliente, id: number) => Promise<void>) {
   const api = await iniciar();
   try {
-    await api.post("/api/empleados/demo");
+    await cargarEmpleadosDePrueba(api);
     const { id } = (await api.post("/api/roles/generar", { anio: 2026, mes: 10, novedades: [] })).json;
     await prueba(api, id);
   } finally {

@@ -68,3 +68,26 @@ export const EMPLEADO = {
   sueldoBase: 1000, fechaIngreso: "2024-01-10", tipoContrato: "Indefinido", escalaId: NIVEL_E2_CT,
   puestoId: PUESTO_AUXILIAR,
 };
+
+/**
+ * Los seis empleados con los que están calculadas a mano las pruebas de roles, IESS y regímenes:
+ * 1 y 2 y 4 = Código del Trabajo, 3 = LOSEP, 5 = LOEP servidor, 6 = LOEP obrero.
+ * Se crean por la API (con su puesto o grado), en este orden, para que sus ids sean del 1 al 6.
+ */
+export async function cargarEmpleadosDePrueba(api: Cliente) {
+  const losep = (await api.get("/api/escala?regimen=LOSEP")).json;
+  const grado = (n: number) => losep.find((g: { grado: number }) => g.grado === n).id;
+  const base = { tipoContrato: "Indefinido", regimen: "CODIGO_TRABAJO" };
+  const empleados = [
+    { ...base, cedula: "1801234566", nombres: "María Fernanda Paredes", cargo: "Gerente General", sueldoBase: 4500, fechaIngreso: "2019-03-01", puestoId: 1 },
+    { ...base, cedula: "1702345677", nombres: "Carlos Andrés Villacís", cargo: "Contador", sueldoBase: 1800, fechaIngreso: "2022-07-15", puestoId: 2 },
+    { ...base, cedula: "0903456788", nombres: "Lucía Estefanía Mora", cargo: "Asistente Administrativa", sueldoBase: 675, fechaIngreso: "2024-02-01", tipoContrato: "Plazo fijo", regimen: "LOSEP", escalaId: grado(5) },
+    { ...base, cedula: "0104567896", nombres: "José Luis Camacho", cargo: "Vendedor", sueldoBase: 900, fechaIngreso: "2025-11-03", puestoId: 3 },
+    { ...base, cedula: "1715678908", nombres: "Daniela Alejandra Ruiz", cargo: "Analista de Sistemas", sueldoBase: 2670, fechaIngreso: "2023-05-10", regimen: "LOEP", categoriaLoep: "servidor", escalaId: grado(19) },
+    { ...base, cedula: "0606789014", nombres: "Pedro Pablo Guamán", cargo: "Bodeguero", sueldoBase: 482, fechaIngreso: "2026-10-16", tipoContrato: "Eventual", regimen: "LOEP", categoriaLoep: "obrero", puestoId: PUESTO_AUXILIAR },
+  ];
+  for (const e of empleados) {
+    const r = await api.post("/api/empleados", e);
+    if (r.status !== 201) throw new Error(`No se pudo crear a ${e.nombres}: ${JSON.stringify(r.json)}`);
+  }
+}
