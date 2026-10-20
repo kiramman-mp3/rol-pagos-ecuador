@@ -1,0 +1,172 @@
+<header class="barra">
+  <div class="barra-interior">
+    <a class="marca" routerLink="/" aria-label="Rol de pagos, página de inicio">
+      Rol de pagos<small>Ecuador 2026</small>
+    </a>
+    <nav class="enlaces" aria-label="Secciones de la página">
+      <a routerLink="/" fragment="como-funciona">Cómo funciona</a>
+      <a routerLink="/" fragment="que-calcula">Qué calcula</a>
+    </nav>
+    <a class="boton boton-pequeno entrar" routerLink="/sistema">Ingresar al sistema</a>
+  </div>
+</header>
+
+<main>
+  <section class="portada">
+    <div class="portada-texto">
+      <h1>El rol de pagos del mes, con la ley de 2026 ya aplicada</h1>
+      <p class="entrada-texto">
+        Registra a tus empleados, anota las horas extras y genera el rol. El sistema calcula el aporte al IESS,
+        el impuesto a la renta, los décimos y los fondos de reserva, y te entrega una boleta para cada trabajador.
+      </p>
+      <div class="acciones">
+        <a class="boton boton-grande" routerLink="/sistema">Ingresar al sistema</a>
+        <a class="boton-texto" routerLink="/" fragment="que-calcula">Ver qué calcula</a>
+      </div>
+      <p class="nota">Incluye empleados de ejemplo para practicar sin escribir nada.</p>
+    </div>
+
+    <section class="hoja simulador" aria-labelledby="titulo-simulador">
+      <div class="hoja-titulo">
+        <h2 id="titulo-simulador">Pruébalo con un sueldo</h2>
+        <p>El cálculo lo hace el mismo motor que genera el rol del mes.</p>
+      </div>
+      <div class="hoja-cuerpo">
+        <div class="campos">
+          <div class="campo">
+            <label for="sim-sueldo">Sueldo base (USD)</label>
+            <input class="entrada num" id="sim-sueldo" type="number" min="1" step="0.01" inputmode="decimal"
+                   [value]="sueldo()" (input)="escribir('sueldo', $event)" />
+          </div>
+          <div class="campo">
+            <label for="sim-horas">Horas suplementarias</label>
+            <input class="entrada num" id="sim-horas" type="number" min="0" step="0.5" inputmode="decimal"
+                   placeholder="0" [value]="horas()" (input)="escribir('horas', $event)" />
+          </div>
+        </div>
+
+        <div class="resultado" aria-live="polite">
+          @if (!entradaValida()) {
+            <p class="apoyo">Escribe un sueldo mayor a cero para ver el cálculo.</p>
+          } @else if (resultado(); as r) {
+            <div class="mini-ecuacion" role="group" aria-label="Del ingreso al neto">
+              <div class="mini termino-ingresos">
+                <span class="etiqueta">Ingresos</span>
+                <span class="cifra">{{ r.totalIngresos | dinero }}</span>
+              </div>
+              <span class="operador" aria-hidden="true">−</span>
+              <div class="mini termino-descuentos">
+                <span class="etiqueta">Descuentos</span>
+                <span class="cifra">{{ r.totalDescuentos | dinero }}</span>
+              </div>
+              <span class="operador" aria-hidden="true">=</span>
+              <div class="mini termino-neto">
+                <span class="etiqueta">Neto a recibir</span>
+                <span class="cifra">{{ r.netoPagar | dinero }}</span>
+              </div>
+            </div>
+            <dl class="desglose">
+              <div><dt>Aporte personal al IESS</dt><dd>{{ r.aporteIess | dinero }}</dd></div>
+              <div><dt>Impuesto a la renta del mes</dt><dd>{{ r.impuestoRenta | dinero }}</dd></div>
+              <div class="provision">
+                <dt>Costo total para la empresa</dt><dd>{{ r.costoEmpleador | dinero }}</dd>
+              </div>
+            </dl>
+          } @else if (simulacion.error()) {
+            <p class="apoyo">
+              No se pudo calcular. Si estás probando en tu computador, revisa que el servidor esté encendido.
+            </p>
+          } @else {
+            <p class="apoyo">Calculando…</p>
+          }
+        </div>
+      </div>
+    </section>
+  </section>
+
+  <section class="seccion" id="como-funciona" aria-labelledby="titulo-pasos">
+    <h2 id="titulo-pasos">De la lista de empleados al rol impreso, en tres pasos</h2>
+    <ol class="pasos">
+      <li>
+        <h3>Registra a tus empleados</h3>
+        <p>Cédula validada, cargo, sueldo, fecha de ingreso y tipo de contrato. Quien ingresa a mitad de mes cobra solo los días trabajados.</p>
+      </li>
+      <li>
+        <h3>Anota las novedades del mes</h3>
+        <p>Horas extras al 50% y al 100%, recargo nocturno, comisiones y anticipos. Lo que dejes en blanco cuenta como cero.</p>
+      </li>
+      <li>
+        <h3>Genera el rol</h3>
+        <p>Obtienes el neto de cada empleado, el costo total para la empresa, una boleta imprimible por trabajador y un archivo para Excel.</p>
+      </li>
+    </ol>
+  </section>
+
+  <section class="seccion" id="que-calcula" aria-labelledby="titulo-ley">
+    <h2 id="titulo-ley">Las reglas de {{ ley()?.anio ?? 2026 }} ya están cargadas</h2>
+    <p class="subtitulo">El rol separa lo que se descuenta al trabajador de lo que la empresa paga aparte.</p>
+
+    @if (ley(); as p) {
+      <div class="reglas">
+        <div class="grupo g-descuentos">
+          <h3 class="t-descuentos">Se descuenta al trabajador</h3>
+          <dl>
+            <div><dt>Aporte personal al IESS</dt><dd>{{ p.iessPersonal | percent: '1.2-2' }} del ingreso</dd></div>
+            <div><dt>Impuesto a la renta</dt><dd>Exento hasta {{ p.fraccionExentaIr | dinero }} al año</dd></div>
+          </dl>
+        </div>
+        <div class="grupo g-provision">
+          <h3 class="t-provision">Lo paga la empresa aparte</h3>
+          <dl>
+            <div><dt>Aporte patronal al IESS</dt><dd>{{ p.iessPatronal | percent: '1.2-2' }} del ingreso</dd></div>
+            <div><dt>Décimo tercero</dt><dd>1/12 del ingreso</dd></div>
+            <div><dt>Décimo cuarto</dt><dd>1/12 del sueldo básico, {{ p.sbu | dinero }}</dd></div>
+            <div><dt>Vacaciones</dt><dd>1/24 del sueldo</dd></div>
+            <div><dt>Fondos de reserva</dt><dd>{{ p.fondosReserva | percent: '1.2-2' }} desde el mes 13</dd></div>
+          </dl>
+        </div>
+      </div>
+
+      <details class="tabla-ir">
+        <summary>Ver la tabla del impuesto a la renta {{ p.anio }}</summary>
+        <div class="deslizable">
+          <table class="tabla">
+            <thead>
+              <tr>
+                <th class="num">Desde</th>
+                <th class="num">Hasta</th>
+                <th class="num">Impuesto de la fracción básica</th>
+                <th class="num">Sobre el excedente</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (t of p.tablaIr; track t.desde) {
+                <tr>
+                  <td class="num">{{ t.desde | dinero }}</td>
+                  <td class="num">{{ t.hasta === null ? 'En adelante' : (t.hasta | dinero) }}</td>
+                  <td class="num">{{ t.cuota | dinero }}</td>
+                  <td class="num">{{ t.porcentaje | percent: '1.0-0' }}</td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+      </details>
+    } @else if (parametros.recurso.error()) {
+      <p class="apoyo">No se pudieron cargar las reglas. Si estás probando en tu computador, revisa que el servidor esté encendido.</p>
+    }
+  </section>
+
+  <section class="cierre" aria-labelledby="titulo-cierre">
+    <h2 id="titulo-cierre">Genera tu primer rol en un par de minutos</h2>
+    <p>Entra al sistema, carga los empleados de ejemplo con un clic y elige el mes.</p>
+    <a class="boton boton-grande" routerLink="/sistema">Ingresar al sistema</a>
+  </section>
+</main>
+
+<footer class="pie">
+  <p>
+    Las cifras salen de la tabla del SRI para {{ ley()?.anio ?? 2026 }} y del sueldo básico unificado de
+    {{ ley()?.sbu | dinero }}. Verifícalas antes de usar el sistema en una nómina real.
+  </p>
+</footer>
