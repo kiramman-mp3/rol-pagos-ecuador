@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { after, before, describe, it } from "node:test";
 
-import { EMPLEADO, iniciar } from "./ayuda.ts";
+import { EMPLEADO, iniciar, NIVEL_E2_CT } from "./ayuda.ts";
 import type { Cliente } from "./ayuda.ts";
 
 describe("API de empleados", () => {
@@ -45,6 +45,9 @@ describe("API de empleados", () => {
   });
 
   it("avisa, sin bloquear, si el sueldo es menor al SBU", async () => {
+    // el mínimo del nivel está por encima del SBU, así que se baja para llegar solo al aviso
+    const nivel = (await api.get(`/api/escala/${NIVEL_E2_CT}`)).json;
+    await api.put(`/api/escala/${NIVEL_E2_CT}`, { ...nivel, rmu: 300 });
     const r = await api.post("/api/empleados", { ...EMPLEADO, cedula: "0903456788", sueldoBase: 400 });
     assert.equal(r.status, 201);
     assert.match(r.json.avisos[0], /SBU/);

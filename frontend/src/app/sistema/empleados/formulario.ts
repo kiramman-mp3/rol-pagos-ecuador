@@ -75,16 +75,32 @@ import type { DatosEmpleado, Empleado, Grado } from '../../core/modelos';
                       (change)="elegirGrado($any($event.target).value)">
                 <option value="">Elige un grado de la tabla</option>
                 @for (g of grados(); track g.id) {
-                  <option [value]="g.id">Grado {{ g.grado }}: {{ g.denominacion }} ({{ g.rmu | dinero }})</option>
+                  <option [value]="g.id">
+                    Grado {{ g.grado }}: {{ g.denominacion }}
+                    ({{ g.esMinimo ? 'mínimo ' : '' }}{{ g.rmu | dinero }})
+                  </option>
                 }
               </select>
-              <span class="ayuda">El sueldo es la remuneración del grado, según la tabla del Ministerio del Trabajo.</span>
+              @if (gradoElegido(); as g) {
+                <span class="ayuda">
+                  @if (g.esMinimo) {
+                    El sueldo no puede ser menor a {{ g.rmu | dinero }}, el mínimo de este nivel
+                    @if (g.rmuMax) { (según la rama, los mínimos llegan a {{ g.rmuMax | dinero }}) }.
+                    Puede ser mayor.
+                  } @else {
+                    El sueldo es la remuneración del grado, según la tabla.
+                  }
+                </span>
+              } @else {
+                <span class="ayuda">El grado fija el sueldo que se paga, según la tabla.</span>
+              }
             </div>
           }
           <div class="campo c3">
             <label for="sueldoBase">Sueldo base (USD)</label>
-            <input class="entrada num" id="sueldoBase" type="number" step="0.01" min="0.01"
-                   formControlName="sueldoBase" [readOnly]="exigeGrado()" />
+            <input class="entrada num" id="sueldoBase" type="number" step="0.01"
+                   formControlName="sueldoBase" [readOnly]="exigeGrado() && !gradoElegido()?.esMinimo"
+                   [min]="gradoElegido()?.esMinimo ? gradoElegido()!.rmu : 0.01" />
             @if (parametros(); as p) {
               <span class="ayuda">El sueldo básico unificado de {{ p.anio }} es {{ p.sbu | dinero }}.</span>
             }
@@ -187,6 +203,11 @@ export class FormularioEmpleado {
     return (this.escala() ?? []).filter((g) => g.regimen === aplicado);
   });
 
+  private readonly gradoId = toSignal(this.form.controls.escalaId.valueChanges, {
+    initialValue: this.form.controls.escalaId.value,
+  });
+  protected readonly gradoElegido = computed(() => this.grados().find((g) => String(g.id) === this.gradoId()));
+
   /** Si el régimen aplicado tiene escala, el grado es obligatorio y fija el sueldo. */
   protected readonly exigeGrado = computed(() => this.grados().length > 0);
 
@@ -245,7 +266,12 @@ export class FormularioEmpleado {
       return;
     }
     if (this.exigeGrado() && !escalaId) {
-      this.avisos.error('Elige un grado de la escala salarial: el sueldo sale de la tabla del MDT.');
+      this.avisos.error('Elige un grado de la escala salarial: el sueldo sale de la tabla.');
+      return;
+    }
+    const nivel = this.gradoElegido();
+    if (nivel?.esMinimo && (resto.sueldoBase ?? 0) < nivel.rmu) {
+      this.avisos.error(`El sueldo no puede ser menor al mínimo del nivel (${nivel.rmu} USD).`);
       return;
     }
     if (this.form.invalid) {

@@ -80,7 +80,7 @@ function validar(
       errores.push(`El grado ${grado.grado} es de la escala ${grado.regimen}, no de ${aplicado}.`);
     } else escalaId = grado.id;
   } else if (aplicado && listarEscala(db, aplicado).length > 0) {
-    errores.push(`Elige un grado de la escala salarial ${aplicado}: el sueldo se toma de la tabla del Ministerio del Trabajo.`);
+    errores.push(`Elige un grado de la escala salarial ${aplicado}: el sueldo se toma de la tabla.`);
   }
 
   // Opciones de pago: vacío = lo que diga el régimen.
@@ -112,8 +112,12 @@ function validar(
       if (sueldoBase < parametros.sbu) {
         avisos.push(`Aviso: el sueldo es menor al SBU ${parametros.anio} ($${parametros.sbu}).`);
       }
-      if (grado && escalaId !== null && sueldoBase !== grado.rmu) {
-        errores.push(`El sueldo ($${sueldoBase}) debe ser la RMU del grado ${grado.grado} ($${grado.rmu}).`);
+      if (grado && escalaId !== null) {
+        if (grado.esMinimo && sueldoBase < grado.rmu) {
+          errores.push(`El sueldo ($${sueldoBase}) no puede ser menor al mínimo del nivel ${grado.denominacion} ($${grado.rmu}).`);
+        } else if (!grado.esMinimo && sueldoBase !== grado.rmu) {
+          errores.push(`El sueldo ($${sueldoBase}) debe ser la RMU del grado ${grado.grado} ($${grado.rmu}).`);
+        }
       }
     }
   } catch (error) {
@@ -171,7 +175,7 @@ export function rutasEmpleados(db: DatabaseSync): Router {
          VALUES (?, ?, ?, ?, ?, ?, ?, ?,
                  (SELECT id FROM escala_salarial WHERE regimen = ? AND grado = ?))`,
         e.cedula, e.nombres, e.cargo, e.sueldoBase, e.fechaIngreso, e.tipoContrato, e.regimen, e.categoriaLoep,
-        "LOSEP", e.escalaGrado,
+        e.escalaRegimen, e.escalaGrado,
       );
       nuevos += Number(r.changes);
     }
