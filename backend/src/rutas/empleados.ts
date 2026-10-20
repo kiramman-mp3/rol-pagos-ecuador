@@ -5,7 +5,8 @@ import { CONTRATOS, EMPLEADOS_DEMO } from "../config.ts";
 import { consultar, ejecutar, filaACamel, uno } from "../db.ts";
 import type { Fila } from "../db.ts";
 import { parametrosDelAnio } from "../parametros.ts";
-import { CATEGORIAS_LOEP, indexarRegimenes, listarRegimenes } from "../regimenes.ts";
+import { buscarGrado } from "../escala.ts";
+import { CATEGORIAS_LOEP, indexarRegimenes, listarRegimenes, regimenAplicado } from "../regimenes.ts";
 import { aDecimal, cedulaValida, ErrorApi, fechaIsoValida } from "../validaciones.ts";
 
 interface DatosEmpleado {
@@ -17,6 +18,7 @@ interface DatosEmpleado {
   tipoContrato: string;
   regimen: string;
   categoriaLoep: string | null;
+  escalaId: number | null;
 }
 
 /** Reglas de negocio del formulario. Devuelve los datos limpios y los avisos no bloqueantes. */
@@ -51,6 +53,23 @@ function validar(
     }
   }
 
+  // Grado de la escala salarial (opcional): debe ser de la escala del régimen que se aplica.
+  let escalaId: number | null = null;
+  const pedido = cuerpo.escalaId;
+  const grado = pedido === null || pedido === undefined || pedido === "" ? undefined : buscarGrado(db, Number(pedido));
+  if (pedido !== null && pedido !== undefined && pedido !== "") {
+    let aplicado: string | null = null;
+    try {
+      aplicado = elegido ? regimenAplicado(indexarRegimenes(listarRegimenes(db)), regimen, categoriaLoep).codigo : null;
+    } catch {
+      /* la categoría faltante ya quedó reportada arriba */
+    }
+    if (!grado) errores.push("El grado de la escala salarial no existe.");
+    else if (aplicado && grado.regimen !== aplicado) {
+      errores.push(`El grado ${grado.grado} es de la escala ${grado.regimen}, no de ${aplicado}.`);
+    } else escalaId = grado.id;
+  }
+
   let sueldoBase = 0;
   try {
     sueldoBase = aDecimal(cuerpo.sueldoBase).toNumber();
@@ -61,6 +80,9 @@ function validar(
       if (sueldoBase < parametros.sbu) {
         avisos.push(`Aviso: el sueldo es menor al SBU ${parametros.anio} ($${parametros.sbu}).`);
       }
+      if (grado && escalaId !== null && sueldoBase !== grado.rmu) {
+        avisos.push(`Aviso: el sueldo ($${sueldoBase}) difiere de la RMU del grado ${grado.grado} ($${grado.rmu}).`);
+      }
     }
   } catch (error) {
     errores.push(`Sueldo base: ${(error as Error).message}.`);
@@ -68,7 +90,7 @@ function validar(
 
   if (errores.length) throw new ErrorApi(400, errores);
   return {
-    datos: { cedula, nombres, cargo, sueldoBase, fechaIngreso, tipoContrato, regimen, categoriaLoep },
+    datos: { cedula, nombres, cargo, sueldoBase, fechaIngreso, tipoContrato, regimen, categoriaLoep, escalaId },
     avisos,
   };
 }
@@ -106,8 +128,11 @@ export function rutasEmpleados(db: DatabaseSync): Router {
       const r = ejecutar(
         db,
         `INSERT OR IGNORE INTO empleados (cedula, nombres, cargo, sueldo_base, fecha_ingreso,
-         tipo_contrato, regimen, categoria_loep) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+         tipo_contrato, regimen, categoria_loep, escala_id)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?,
+                 (SELECT id FROM escala_salarial WHERE regimen = ? AND grado = ?))`,
         e.cedula, e.nombres, e.cargo, e.sueldoBase, e.fechaIngreso, e.tipoContrato, e.regimen, e.categoriaLoep,
+        "LOSEP", e.escalaGrado,
       );
       nuevos += Number(r.changes);
     }
@@ -125,9 +150,9 @@ export function rutasEmpleados(db: DatabaseSync): Router {
       const r = ejecutar(
         db,
         `INSERT INTO empleados (cedula, nombres, cargo, sueldo_base, fecha_ingreso, tipo_contrato,
-         regimen, categoria_loep) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+         regimen, categoria_loep, escala_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         datos.cedula, datos.nombres, datos.cargo, datos.sueldoBase, datos.fechaIngreso,
-        datos.tipoContrato, datos.regimen, datos.categoriaLoep,
+        datos.tipoContrato, datos.regimen, datos.categoriaLoep, datos.escalaId,
       );
       id = Number(r.lastInsertRowid);
     });
@@ -141,9 +166,10 @@ export function rutasEmpleados(db: DatabaseSync): Router {
       ejecutar(
         db,
         `UPDATE empleados SET cedula = ?, nombres = ?, cargo = ?, sueldo_base = ?,
-         fecha_ingreso = ?, tipo_contrato = ?, regimen = ?, categoria_loep = ? WHERE id = ?`,
+         fecha_ingreso = ?, tipo_contrato = ?, regimen = ?, categoria_loep = ?, escala_id = ?
+         WHERE id = ?`,
         datos.cedula, datos.nombres, datos.cargo, datos.sueldoBase, datos.fechaIngreso,
-        datos.tipoContrato, datos.regimen, datos.categoriaLoep, actual.id,
+        datos.tipoContrato, datos.regimen, datos.categoriaLoep, datos.escalaId, actual.id,
       );
     });
     res.json({ ...aApi(buscar(req.params.id)), avisos });
