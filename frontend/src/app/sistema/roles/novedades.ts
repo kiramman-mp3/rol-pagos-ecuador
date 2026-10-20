@@ -19,12 +19,14 @@ interface Fila extends NovedadEnviada {
   sueldoBase: number;
   regimen: string;
   regimenAplicado: string;
+  /** false = no cobra horas suplementarias, extraordinarias ni de descanso */
+  recibeHorasExtras: boolean;
 }
 
-const COLUMNAS: { campo: Campo; etiqueta: string; corte?: boolean }[] = [
-  { campo: 'horasSuplementarias', etiqueta: 'Horas suplementarias', corte: true },
-  { campo: 'horasExtraordinarias', etiqueta: 'Horas extraordinarias' },
-  { campo: 'horasDescanso', etiqueta: 'Horas en sábado, domingo o feriado' },
+const COLUMNAS: { campo: Campo; etiqueta: string; corte?: boolean; extra?: boolean }[] = [
+  { campo: 'horasSuplementarias', etiqueta: 'Horas suplementarias', corte: true, extra: true },
+  { campo: 'horasExtraordinarias', etiqueta: 'Horas extraordinarias', extra: true },
+  { campo: 'horasDescanso', etiqueta: 'Horas en sábado, domingo o feriado', extra: true },
   { campo: 'horasNocturnas', etiqueta: 'Horas nocturnas' },
   { campo: 'comisiones', etiqueta: 'Comisiones y bonos' },
   { campo: 'otrosDescuentos', etiqueta: 'Anticipos y otros descuentos', corte: true },
@@ -89,6 +91,8 @@ const COLUMNAS: { campo: Campo; etiqueta: string; corte?: boolean }[] = [
                         <td [class.corte]="c.corte">
                           <input class="entrada entrada-compacta num" type="number" step="0.01" min="0"
                                  inputmode="decimal" placeholder="0"
+                                 [disabled]="!!c.extra && !f.recibeHorasExtras"
+                                 [attr.title]="c.extra && !f.recibeHorasExtras ? 'Este empleado no recibe horas extras' : null"
                                  [value]="f[c.campo]"
                                  (input)="cambiar(i, c.campo, $any($event.target).value)"
                                  [attr.aria-label]="c.etiqueta + ' de ' + f.nombres" />
@@ -179,6 +183,7 @@ export class NovedadesMes {
           sueldoBase: e.sueldoBase,
           regimen: e.regimen,
           regimenAplicado: e.regimenAplicado,
+          recibeHorasExtras: e.recibeHorasExtras,
           horasSuplementarias: texto(e.novedades.horasSuplementarias),
           horasExtraordinarias: texto(e.novedades.horasExtraordinarias),
           horasDescanso: texto(e.novedades.horasDescanso),
