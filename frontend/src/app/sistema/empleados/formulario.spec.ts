@@ -214,6 +214,19 @@ describe('FormularioEmpleado', () => {
     expect(el.querySelector<HTMLSelectElement>('#escalaId')!.value).toBe('21'); // el del puesto
   });
 
+  it('con puestos, el select ofrece solo los niveles de la familia del puesto elegido', async () => {
+    const hermano: Grado = { ...NIVEL_MINIMO, id: 22, grado: 3, denominacion: 'B2: Supervisión técnica', rmu: 490 };
+    const otraFamilia: Grado = { ...NIVEL_MINIMO, id: 23, grado: 5, denominacion: 'C1: Operación especializada', rmu: 490 };
+    const { fixture, el } = await abrir([...GRADOS, NIVEL_MINIMO, hermano, otraFamilia], [PUESTO]);
+    const opciones = () => [...el.querySelectorAll('#escalaId option')].map((o) => o.getAttribute('value'));
+    expect(opciones()).toEqual(['']); // sin puesto no hay niveles que ofrecer
+
+    escribir(el, 'puestoId', '31', 'change'); // referencia B1
+    fixture.detectChanges();
+    expect(opciones()).toEqual(['', '21', '22']); // B1 y B2, no C1
+    expect(el.querySelector('#escalaId')!.closest('.campo')!.classList).toContain('c6'); // todo el ancho
+  });
+
   it('con puestos, se puede elegir otro nivel: cambia el sueldo mínimo, no el cargo', async () => {
     const otro: Grado = { ...NIVEL_MINIMO, id: 22, grado: 3, denominacion: 'B2: Supervisión técnica', rmu: 490, rmuMax: 650 };
     const { fixture, el } = await abrir([...GRADOS, NIVEL_MINIMO, otro], [PUESTO]);
