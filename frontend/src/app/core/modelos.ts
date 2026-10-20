@@ -172,6 +172,29 @@ export interface RolCabecera {
   totalCosto: number;
 }
 
+/** Aportes de un empleado en un rol, para contrastarlos con el comprobante del IESS. */
+export interface FilaIess {
+  cedula: string;
+  nombres: string;
+  regimenAplicado: string;
+  diasTrabajados: number;
+  materiaGravada: number;
+  tasaPersonal: number;
+  aportePersonal: number;
+  tasaPatronal: number;
+  aportePatronal: number;
+  totalAportes: number;
+  fondosADepositar: number;
+  fondosPagadosEnRol: number;
+}
+
+export interface PlanillaIess {
+  anio: number;
+  mes: number;
+  filas: FilaIess[];
+  totales: Omit<FilaIess, 'cedula' | 'nombres' | 'regimenAplicado' | 'diasTrabajados' | 'tasaPersonal' | 'tasaPatronal'>;
+}
+
 export interface RolCompleto extends RolCabecera {
   detalle: RolDetalle[];
 }

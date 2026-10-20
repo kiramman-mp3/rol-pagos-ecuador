@@ -8,7 +8,7 @@ import { Api, ParametrosLey, valorSeguro } from '../../core/api';
 import { Avisos } from '../../core/avisos';
 import { DineroPipe, sumar } from '../../core/dinero.pipe';
 import { etiquetaRegimen } from '../../core/regimen';
-import type { Modalidad, RolCompleto, RolDetalle } from '../../core/modelos';
+import type { Modalidad, PlanillaIess, RolCompleto, RolDetalle } from '../../core/modelos';
 
 @Component({
   selector: 'app-detalle-rol',
@@ -26,6 +26,7 @@ import type { Modalidad, RolCompleto, RolDetalle } from '../../core/modelos';
         <div class="acciones no-imprimir">
           <a class="boton boton-claro" [routerLink]="['/sistema/roles/novedades', r.anio, r.mes]">Recalcular</a>
           <a class="boton boton-claro" [href]="'/api/roles/' + r.id + '/csv'" download>Descargar CSV</a>
+          <a class="boton boton-claro" [href]="'/api/roles/' + r.id + '/iess.csv'" download>Aportes para el IESS</a>
           <button class="boton boton-claro" type="button" (click)="imprimir()">Imprimir</button>
           <button class="boton-texto boton-peligro" type="button" (click)="eliminar(r)">Eliminar rol</button>
         </div>
@@ -212,6 +213,69 @@ import type { Modalidad, RolCompleto, RolDetalle } from '../../core/modelos';
           fondos de reserva desde el mes 13. El costo del empleador es el total de ingresos más estas provisiones.
         </div>
       </section>
+
+      @if (iess(); as p) {
+        <section class="hoja" aria-labelledby="titulo-iess">
+          <div class="hoja-titulo">
+            <h2 id="titulo-iess">Conciliación con el IESS</h2>
+            <p>
+              El IESS arma la planilla en su portal con tus avisos y novedades; no recibe un archivo. Descarga el
+              comprobante del mes (se puede bajar en Excel) y compara, empleado por empleado, la materia gravada y
+              los aportes de esta tabla.
+            </p>
+          </div>
+          <div class="deslizable">
+            <table class="tabla planilla">
+              <thead>
+                <tr>
+                  <th>Empleado</th>
+                  <th class="num">Materia gravada</th>
+                  <th class="num">Aporte personal</th>
+                  <th class="num">Aporte patronal</th>
+                  <th class="num">Total aportes</th>
+                  <th class="num" title="Fondos de reserva que el trabajador acumula: se depositan en el IESS">Fondos a depositar</th>
+                  <th class="num" title="Fondos de reserva que ya se pagaron en el rol">Fondos pagados en el rol</th>
+                </tr>
+              </thead>
+              <tbody>
+                @for (f of p.filas; track f.cedula) {
+                  <tr>
+                    <td>{{ f.nombres }}<span class="secundario">{{ f.cedula }}</span></td>
+                    <td class="num">{{ f.materiaGravada | dinero }}</td>
+                    <td class="num">
+                      {{ f.aportePersonal | dinero }}
+                      <span class="secundario">{{ f.tasaPersonal | percent: '1.2-2' }}</span>
+                    </td>
+                    <td class="num">
+                      {{ f.aportePatronal | dinero }}
+                      <span class="secundario">{{ f.tasaPatronal | percent: '1.2-2' }}</span>
+                    </td>
+                    <td class="num"><strong>{{ f.totalAportes | dinero }}</strong></td>
+                    <td class="num">{{ f.fondosADepositar | dinero }}</td>
+                    <td class="num">{{ f.fondosPagadosEnRol | dinero }}</td>
+                  </tr>
+                }
+              </tbody>
+              <tfoot>
+                <tr>
+                  <td>Totales</td>
+                  <td class="num">{{ p.totales.materiaGravada | dinero }}</td>
+                  <td class="num">{{ p.totales.aportePersonal | dinero }}</td>
+                  <td class="num">{{ p.totales.aportePatronal | dinero }}</td>
+                  <td class="num">{{ p.totales.totalAportes | dinero }}</td>
+                  <td class="num">{{ p.totales.fondosADepositar | dinero }}</td>
+                  <td class="num">{{ p.totales.fondosPagadosEnRol | dinero }}</td>
+                </tr>
+              </tfoot>
+            </table>
+          </div>
+          <div class="hoja-cuerpo pequeno apoyo">
+            La materia gravada es el sueldo, las horas extras y las comisiones: los décimos y los fondos de reserva
+            pagados en el rol no la integran. Los décimos se declaran aparte, en el sistema de décimos del Ministerio
+            del Trabajo, no en la planilla del IESS.
+          </div>
+        </section>
+      }
     } @else if (rol.error()) {
       <div class="aviso aviso-danger" role="status">
         No se encontró este rol. Puede que se haya eliminado.
@@ -231,6 +295,7 @@ export class DetalleRol {
   protected readonly parametros = inject(ParametrosLey).valor;
   protected readonly rol = httpResource<RolCompleto>(() => `/api/roles/${this.id()}`);
   protected readonly datos = valorSeguro(this.rol);
+  protected readonly iess = valorSeguro(httpResource<PlanillaIess>(() => `/api/roles/${this.id()}/iess`));
 
   protected readonly nombreMes = computed(
     () => this.parametros()?.meses[(this.datos()?.mes ?? 1) - 1] ?? '',

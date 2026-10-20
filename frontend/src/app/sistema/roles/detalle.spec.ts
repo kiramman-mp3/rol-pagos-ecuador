@@ -36,6 +36,26 @@ const PARAMETROS = {
   regimenes: [{ codigo: 'CODIGO_TRABAJO', nombre: 'Código del Trabajo' }],
 };
 
+const IESS = {
+  anio: 2026, mes: 10,
+  filas: [
+    {
+      cedula: '1801234566', nombres: 'Ana Mensual', regimenAplicado: 'CODIGO_TRABAJO', diasTrabajados: 30,
+      materiaGravada: 1800, tasaPersonal: 0.0945, aportePersonal: 170.1, tasaPatronal: 0.1115, aportePatronal: 200.7,
+      totalAportes: 370.8, fondosADepositar: 0, fondosPagadosEnRol: 149.94,
+    },
+    {
+      cedula: '0903456788', nombres: 'Beto Acumula', regimenAplicado: 'CODIGO_TRABAJO', diasTrabajados: 30,
+      materiaGravada: 1800, tasaPersonal: 0.0945, aportePersonal: 170.1, tasaPatronal: 0.1115, aportePatronal: 200.7,
+      totalAportes: 370.8, fondosADepositar: 149.94, fondosPagadosEnRol: 0,
+    },
+  ],
+  totales: {
+    materiaGravada: 3600, aportePersonal: 340.2, aportePatronal: 401.4, totalAportes: 741.6,
+    fondosADepositar: 149.94, fondosPagadosEnRol: 149.94,
+  },
+};
+
 describe('DetalleRol', () => {
   let http: HttpTestingController;
 
@@ -53,6 +73,7 @@ describe('DetalleRol', () => {
     TestBed.tick();
     http.expectOne('/api/parametros').flush(PARAMETROS);
     http.expectOne('/api/roles/1').flush(ROL);
+    http.expectOne('/api/roles/1/iess').flush(IESS);
     await fixture.whenStable();
     fixture.detectChanges();
     return fixture.nativeElement as HTMLElement;
@@ -87,5 +108,24 @@ describe('DetalleRol', () => {
     expect(el.textContent).toContain('Código del Trabajo');
     expect(el.textContent).toContain('9.45%');
     expect(el.textContent).toContain('11.15%');
+  });
+
+  it('muestra la conciliación con el IESS: materia gravada, aportes y fondos a depositar', async () => {
+    const el = await abrir();
+    const secciones = [...el.querySelectorAll('section')];
+    const iess = secciones[secciones.length - 1];
+    expect(iess.textContent).toContain('Conciliación con el IESS');
+    const [mensual, acumula] = [...iess.querySelectorAll('tbody tr')].map((f) => f.textContent ?? '');
+    expect(mensual).toContain('$1,800.00');
+    expect(mensual).toContain('$170.10');
+    expect(mensual).toContain('$370.80');
+    expect(acumula).toContain('$149.94'); // fondos que se depositan en el IESS
+    expect(iess.querySelector('tfoot')!.textContent).toContain('$741.60');
+  });
+
+  it('ofrece descargar los aportes para compararlos con el comprobante del IESS', async () => {
+    const el = await abrir();
+    const enlace = [...el.querySelectorAll('a')].find((a) => a.textContent?.includes('Aportes para el IESS'))!;
+    expect(enlace.getAttribute('href')).toBe('/api/roles/1/iess.csv');
   });
 });
