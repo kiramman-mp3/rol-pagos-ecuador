@@ -1,15 +1,17 @@
 import { httpResource } from '@angular/common/http';
+import { PercentPipe } from '@angular/common';
 import { Component, computed, inject, input } from '@angular/core';
 import { RouterLink } from '@angular/router';
 
 import { ParametrosLey, valorSeguro } from '../../core/api';
 import { DineroPipe } from '../../core/dinero.pipe';
-import type { RolCompleto } from '../../core/modelos';
+import type { RolCompleto, RolDetalle } from '../../core/modelos';
+import { etiquetaRegimen } from '../../core/regimen';
 
 /** Comprobante individual, pensado para imprimirse en una sola hoja. */
 @Component({
   selector: 'app-boleta',
-  imports: [RouterLink, DineroPipe],
+  imports: [RouterLink, DineroPipe, PercentPipe],
   template: `
     <div class="acciones no-imprimir" style="margin-bottom: 1.25rem">
       <a class="boton boton-claro" [routerLink]="['/sistema/roles', id()]">Volver al rol</a>
@@ -29,6 +31,7 @@ import type { RolCompleto } from '../../core/modelos';
             <div><dt>Empleado</dt><dd>{{ d.nombres }}</dd></div>
             <div><dt>Cédula</dt><dd>{{ d.cedula }}</dd></div>
             <div><dt>Cargo</dt><dd>{{ d.cargo }}</dd></div>
+            <div><dt>Régimen</dt><dd>{{ regimen(d) }}</dd></div>
             <div><dt>Ingreso</dt><dd>{{ d.fechaIngreso }}</dd></div>
           </dl>
 
@@ -74,7 +77,7 @@ import type { RolCompleto } from '../../core/modelos';
                 </tr>
               </thead>
               <tbody>
-                <tr><td>Aporte personal al IESS (9.45%)</td><td class="num">{{ d.aporteIess | dinero }}</td></tr>
+                <tr><td>Aporte personal al IESS ({{ d.tasaIessPersonal | percent: '1.2-2' }})</td><td class="num">{{ d.aporteIess | dinero }}</td></tr>
                 <tr><td>Impuesto a la renta</td><td class="num">{{ d.impuestoRenta | dinero }}</td></tr>
                 @if (d.otrosDescuentos) {
                   <tr><td>Anticipos y otros</td><td class="num">{{ d.otrosDescuentos | dinero }}</td></tr>
@@ -108,7 +111,7 @@ import type { RolCompleto } from '../../core/modelos';
               <tr><td>Décimo cuarto sueldo</td><td class="num">{{ d.decimoCuarto | dinero }}</td></tr>
               <tr><td>Vacaciones</td><td class="num">{{ d.vacaciones | dinero }}</td></tr>
               <tr><td>Fondos de reserva</td><td class="num">{{ d.fondosReserva | dinero }}</td></tr>
-              <tr><td>Aporte patronal al IESS (11.15%)</td><td class="num">{{ d.aportePatronal | dinero }}</td></tr>
+              <tr><td>Aporte patronal al IESS ({{ d.tasaIessPatronal | percent: '1.2-2' }})</td><td class="num">{{ d.aportePatronal | dinero }}</td></tr>
             </tbody>
           </table>
 
@@ -141,6 +144,10 @@ export class Boleta {
   protected readonly nombreMes = computed(
     () => this.parametros()?.meses[(this.datos()?.mes ?? 1) - 1] ?? '',
   );
+
+  protected regimen(d: RolDetalle): string {
+    return etiquetaRegimen(this.parametros()?.regimenes, d.regimen, d.regimenAplicado);
+  }
 
   protected imprimir() {
     window.print();

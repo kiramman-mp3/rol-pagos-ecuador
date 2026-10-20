@@ -61,6 +61,8 @@ a:hover { color: var(--tinta); }
 
 .apoyo { color: var(--tinta-suave); }
 .pequeno { font-size: .875rem; }
+.sin-vinetas { list-style: none; padding: 0; margin: 0 0 .75rem; }
+.sin-vinetas li { margin: .3rem 0; }
 .num { text-align: right; white-space: nowrap; }
 .solo-lectura { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
 
