@@ -51,41 +51,57 @@ describe('Organico', () => {
     campo.dispatchEvent(new Event('change'));
   };
 
-  it('muestra los puestos de arriba abajo, sangrando a los subordinados', async () => {
+  const cajas = (el: HTMLElement) => [...el.querySelectorAll<HTMLButtonElement>('button.caja-puesto')];
+
+  it('dibuja el organigrama como árbol: cada puesto dentro de la lista de su superior', async () => {
     const { el } = await abrir();
-    const puestos = [...el.querySelectorAll<HTMLElement>('article.puesto')];
-    expect(puestos.map((p) => p.querySelector('h3')!.textContent?.trim())).toEqual([
+    expect(cajas(el).map((c) => c.querySelector('.caja-nombre')!.textContent?.trim())).toEqual([
       'Gerente / Propietario', 'Administrador / Contador', 'Supervisor de instalaciones',
     ]);
-    expect(puestos[0].style.marginLeft).toBe('0rem');
-    expect(puestos[1].style.marginLeft).toBe('1.75rem');
-    expect(puestos[2].style.marginLeft).toBe('3.5rem');
+    const raiz = el.querySelector('ul.arbol > li')!;
+    expect(raiz.querySelector(':scope > button')!.textContent).toContain('Gerente / Propietario');
+    const admin = raiz.querySelector(':scope > ul > li')!;
+    expect(admin.querySelector(':scope > button')!.textContent).toContain('Administrador / Contador');
+    expect(admin.querySelector(':scope > ul > li > button')!.textContent).toContain('Supervisor de instalaciones');
   });
 
-  it('cada puesto trae función, responsabilidad, sector y referencia salarial', async () => {
+  it('cada recuadro muestra el responsable o que no lo tiene, y el nivel salarial', async () => {
     const { el } = await abrir();
-    const gerente = el.querySelector('article.puesto')!.textContent!;
-    expect(gerente).toContain('Función de Gerente / Propietario.');
-    expect(gerente).toContain('Responsabilidad de Gerente / Propietario.');
-    expect(gerente).toContain('Servicios');
-    expect(gerente).toContain('A: Jefatura');
-    expect(gerente).toContain('mínimo');
-    expect(el.textContent).toContain('2 empleados');
+    const [gerente, administrador] = cajas(el);
+    expect(gerente.querySelector('.caja-persona')!.textContent).toContain('Sin responsable');
+    expect(gerente.querySelector('.caja-persona')!.classList).toContain('caja-vacia');
+    expect(administrador.querySelector('.caja-persona')!.textContent).toBe('José Gabriel Manzano');
+    expect(gerente.querySelector('.caja-nivel')!.textContent).toBe('A: Jefatura');
   });
 
-  it('muestra el nombre del responsable de cada puesto o que no lo tiene', async () => {
-    const { el } = await abrir();
-    const [gerente, administrador] = [...el.querySelectorAll<HTMLElement>('article.puesto')];
-    expect(gerente.querySelector('.responsable')!.textContent).toContain('Sin responsable asignado');
-    expect(administrador.querySelector('.responsable strong')!.textContent).toBe('José Gabriel Manzano');
-    expect(gerente.textContent).toContain('Nadie ocupa este puesto todavía');
+  it('al abrir, el detalle es el de la cabeza del organigrama; al tocar otro recuadro cambia', async () => {
+    const { fixture, el } = await abrir();
+    const detalle = () => el.querySelector('.detalle-puesto')!;
+    expect(detalle().querySelector('h2')!.textContent).toBe('Gerente / Propietario');
+    expect(detalle().textContent).toContain('Función de Gerente / Propietario.');
+    expect(detalle().textContent).toContain('Responsabilidad de Gerente / Propietario.');
+    expect(detalle().textContent).toContain('Servicios');
+    expect(detalle().textContent).toContain('A: Jefatura: mínimo');
+    expect(detalle().textContent).toContain('Nadie. Asigna el puesto');
+    expect(cajas(el)[0].classList).toContain('activa');
+
+    cajas(el)[1].click();
+    fixture.detectChanges();
+    expect(detalle().querySelector('h2')!.textContent).toBe('Administrador / Contador');
+    expect(detalle().textContent).toContain('depende de Gerente / Propietario');
+    expect(detalle().textContent).toContain('2 empleados ocupan este puesto');
+    expect(detalle().querySelector('.responsable strong')!.textContent).toBe('José Gabriel Manzano');
+    expect(cajas(el)[1].classList).toContain('activa');
+    expect(cajas(el)[0].classList).not.toContain('activa');
   });
 
   it('el select de responsable ofrece solo a quienes ocupan el puesto y guarda el cambio', async () => {
     const { fixture, el } = await abrir();
+    expect(el.querySelector('#responsable-1')).toBeNull(); // nadie ocupa el puesto del gerente
+    cajas(el)[1].click(); // el administrador sí tiene ocupantes
+    fixture.detectChanges();
     const opciones = [...el.querySelectorAll('#responsable-2 option')].map((o) => o.textContent?.trim());
     expect(opciones).toEqual(['Sin responsable', 'José Gabriel Manzano', 'Rosa Prueba']);
-    expect(el.querySelector('#responsable-1')).toBeNull(); // nadie ocupa el puesto 1
 
     escribir(el, '#responsable-2', '8');
     fixture.detectChanges();
@@ -96,13 +112,13 @@ describe('Organico', () => {
     await new Promise((resolver) => setTimeout(resolver));
     TestBed.tick();
     const recarga = http.match('/api/puestos');
-    expect(recarga.length).toBe(1); // se vuelve a pedir el orgánico
+    expect(recarga.length).toBe(1); // se vuelve a pedir el organigrama
     recarga[0].flush(PUESTOS);
   });
 
   it('al editar, un puesto no se ofrece a sí mismo ni a sus subordinados como superior', async () => {
     const { fixture, el } = await abrir();
-    el.querySelectorAll<HTMLButtonElement>('article.puesto .boton-texto')[0].click(); // editar al gerente
+    el.querySelector<HTMLButtonElement>('.detalle-puesto .boton-texto')!.click(); // editar al gerente, el puesto abierto
     fixture.detectChanges();
     const opciones = [...el.querySelectorAll('#puesto-superior option')].map((o) => o.textContent?.trim());
     expect(opciones).toEqual(['Nadie: es la cabeza del orgánico']);

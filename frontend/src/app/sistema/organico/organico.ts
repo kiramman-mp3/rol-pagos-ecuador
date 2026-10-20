@@ -1,4 +1,5 @@
 import { httpResource } from '@angular/common/http';
+import { NgTemplateOutlet } from '@angular/common';
 import { Component, computed, inject, signal } from '@angular/core';
 import { firstValueFrom } from 'rxjs';
 
@@ -21,10 +22,16 @@ interface Borrador {
 
 const VACIO: Borrador = { id: null, nombre: '', superiorId: '', funcion: '', responsabilidad: '', sector: '', escalaId: '' };
 
-/** Un puesto con su profundidad en el orgánico, para dibujarlo sangrado bajo su superior. */
+/** Un puesto con su profundidad en el orgánico (para saber qué cuelga de qué al editar). */
 interface Linea {
   puesto: Puesto;
   nivel: number;
+}
+
+/** Un puesto con los puestos que dependen de él: un nodo del organigrama. */
+interface Nodo {
+  puesto: Puesto;
+  hijos: Nodo[];
 }
 
 /**
@@ -33,7 +40,7 @@ interface Linea {
  */
 @Component({
   selector: 'app-organico',
-  imports: [DineroPipe],
+  imports: [DineroPipe, NgTemplateOutlet],
   template: `
     <div class="encabezado">
       <h1>Orgánico funcional</h1>
@@ -41,71 +48,114 @@ interface Linea {
 
     <section class="hoja" aria-labelledby="titulo-organico">
       <div class="hoja-titulo">
-        <h2 id="titulo-organico">Puestos de la empresa</h2>
+        <h2 id="titulo-organico">Organigrama</h2>
         <p>
-          Antes de asignar un sueldo se identifica el puesto: su función, su responsabilidad, el sector económico y
-          el nivel de la escala salarial que sirve de referencia. Los niveles de ejemplo salen de una tabla de clase y
-          están <strong>por confirmar</strong>.
+          Cada recuadro es un puesto, con el nombre de su responsable. Toca uno para ver su función,
+          su responsabilidad, el sector económico y la referencia salarial, o para cambiar a su responsable.
+          Los niveles de ejemplo salen de una tabla de clase y están <strong>por confirmar</strong>.
         </p>
       </div>
       <div class="hoja-cuerpo">
-        @for (l of lineas(); track l.puesto.id) {
-          <article class="puesto" [style.margin-left.rem]="l.nivel * 1.75" [class.puesto-raiz]="l.nivel === 0">
-            <header>
-              <h3>{{ l.puesto.nombre }}</h3>
-              <span class="apoyo pequeno">
-                {{ l.puesto.empleados }} {{ l.puesto.empleados === 1 ? 'empleado' : 'empleados' }}
-              </span>
-            </header>
-            <p class="responsable" [class.sin-responsable]="!l.puesto.responsable">
-              <span class="etiqueta-responsable">Responsable</span>
-              @if (l.puesto.responsable; as r) {
-                <strong>{{ r.nombres }}</strong>
+        <ng-template #nodoPlantilla let-nodo>
+          <li>
+            <button type="button" class="caja-puesto" [class.activa]="nodo.puesto.id === seleccionado()?.id"
+                    [attr.aria-pressed]="nodo.puesto.id === seleccionado()?.id" (click)="seleccionar(nodo.puesto)">
+              <span class="caja-nombre">{{ nodo.puesto.nombre }}</span>
+              @if (nodo.puesto.responsable; as r) {
+                <span class="caja-persona">{{ r.nombres }}</span>
               } @else {
-                Sin responsable asignado
+                <span class="caja-persona caja-vacia">Sin responsable</span>
               }
-            </p>
-            <dl class="ficha-puesto">
-              <dt>Función</dt><dd>{{ l.puesto.funcion }}</dd>
-              <dt>Responsabilidad</dt><dd>{{ l.puesto.responsabilidad }}</dd>
-              <dt>Sector económico</dt><dd>{{ l.puesto.sector }}</dd>
-              <dt>Referencia salarial</dt>
-              <dd>
-                @if (l.puesto.referencia; as r) {
-                  {{ r.denominacion }}: {{ r.esMinimo ? 'mínimo ' : '' }}{{ r.rmu | dinero }}
-                  @if (r.rmuMax) { <span class="apoyo pequeno">(según la rama, hasta {{ r.rmuMax | dinero }})</span> }
-                } @else {
-                  Sin nivel: elige uno al editar el puesto.
+              @if (nodo.puesto.referencia; as ref) {
+                <span class="caja-nivel">{{ ref.denominacion }}</span>
+              }
+            </button>
+            @if (nodo.hijos.length) {
+              <ul>
+                @for (hijo of nodo.hijos; track hijo.puesto.id) {
+                  <ng-container [ngTemplateOutlet]="nodoPlantilla" [ngTemplateOutletContext]="{ $implicit: hijo }" />
                 }
-              </dd>
-            </dl>
-            @if (l.puesto.ocupantes.length) {
-              <div class="asignar-responsable no-imprimir">
-                <label [for]="'responsable-' + l.puesto.id">Cambiar responsable</label>
-                <select class="entrada" [id]="'responsable-' + l.puesto.id"
-                        (change)="asignarResponsable(l.puesto, $any($event.target).value)">
-                  <option value="" [selected]="!l.puesto.responsable">Sin responsable</option>
-                  @for (o of l.puesto.ocupantes; track o.id) {
-                    <option [value]="o.id" [selected]="l.puesto.responsable?.id === o.id">{{ o.nombres }}</option>
-                  }
-                </select>
-              </div>
-            } @else {
-              <p class="apoyo pequeno">Nadie ocupa este puesto todavía: asigna el puesto al crear o editar un empleado.</p>
+              </ul>
             }
-            <div class="acciones-puesto">
-              <button class="boton-texto" type="button" (click)="editar(l.puesto)">Editar</button>
-              <button class="boton-texto boton-peligro" type="button" (click)="eliminar(l.puesto)">Eliminar</button>
-            </div>
-          </article>
-        } @empty {
+          </li>
+        </ng-template>
+
+        @if (arbol().length) {
+          <div class="arbol-contenedor">
+            <ul class="arbol">
+              @for (raiz of arbol(); track raiz.puesto.id) {
+                <ng-container [ngTemplateOutlet]="nodoPlantilla" [ngTemplateOutletContext]="{ $implicit: raiz }" />
+              }
+            </ul>
+          </div>
+        } @else {
           <p class="tabla-vacia">
-            @if (puestos.isLoading()) { Cargando el orgánico… }
+            @if (puestos.isLoading()) { Cargando el organigrama… }
             @else { Todavía no hay puestos. Agrega el primero con el formulario de abajo. }
           </p>
         }
       </div>
     </section>
+
+    @if (seleccionado(); as p) {
+      <section class="hoja detalle-puesto" aria-labelledby="titulo-detalle">
+        <div class="hoja-titulo">
+          <h2 id="titulo-detalle">{{ p.nombre }}</h2>
+          <p class="apoyo pequeno">
+            {{ p.empleados }} {{ p.empleados === 1 ? 'empleado ocupa' : 'empleados ocupan' }} este puesto
+            @if (jefe(p); as j) { · depende de {{ j.nombre }} }
+          </p>
+        </div>
+        <div class="hoja-cuerpo">
+          <p class="responsable" [class.sin-responsable]="!p.responsable">
+            <span class="etiqueta-responsable">Responsable</span>
+            @if (p.responsable; as r) {
+              <strong>{{ r.nombres }}</strong>
+            } @else {
+              Sin responsable asignado
+            }
+          </p>
+          <dl class="ficha-puesto">
+            <dt>Función</dt><dd>{{ p.funcion }}</dd>
+            <dt>Responsabilidad</dt><dd>{{ p.responsabilidad }}</dd>
+            <dt>Sector económico</dt><dd>{{ p.sector }}</dd>
+            <dt>Referencia salarial</dt>
+            <dd>
+              @if (p.referencia; as r) {
+                {{ r.denominacion }}: {{ r.esMinimo ? 'mínimo ' : '' }}{{ r.rmu | dinero }}
+                @if (r.rmuMax) { <span class="apoyo pequeno">(según la rama, hasta {{ r.rmuMax | dinero }})</span> }
+              } @else {
+                Sin nivel: elige uno al editar el puesto.
+              }
+            </dd>
+            <dt>Ocupantes</dt>
+            <dd>
+              @if (p.ocupantes.length) {
+                {{ nombresDe(p) }}
+              } @else {
+                Nadie. Asigna el puesto al crear o editar un empleado.
+              }
+            </dd>
+          </dl>
+          @if (p.ocupantes.length) {
+            <div class="asignar-responsable no-imprimir">
+              <label [for]="'responsable-' + p.id">Cambiar responsable</label>
+              <select class="entrada" [id]="'responsable-' + p.id"
+                      (change)="asignarResponsable(p, $any($event.target).value)">
+                <option value="" [selected]="!p.responsable">Sin responsable</option>
+                @for (o of p.ocupantes; track o.id) {
+                  <option [value]="o.id" [selected]="p.responsable?.id === o.id">{{ o.nombres }}</option>
+                }
+              </select>
+            </div>
+          }
+          <div class="acciones-puesto">
+            <button class="boton-texto" type="button" (click)="editar(p)">Editar puesto</button>
+            <button class="boton-texto boton-peligro" type="button" (click)="eliminar(p)">Eliminar puesto</button>
+          </div>
+        </div>
+      </section>
+    }
 
     <section class="hoja" aria-labelledby="titulo-puesto">
       <div class="hoja-titulo">
@@ -179,6 +229,13 @@ export class Organico {
   /** Los niveles que un puesto puede tomar como referencia: todos los de la escala. */
   protected readonly niveles = computed(() => this.escala() ?? []);
 
+  /** Puesto elegido en el organigrama; mientras no se elija ninguno, la cabeza del organigrama. */
+  private readonly elegidoId = signal<number | null>(null);
+  protected readonly seleccionado = computed(() => {
+    const todos = this.todos() ?? [];
+    return todos.find((p) => p.id === this.elegidoId()) ?? this.arbol()[0]?.puesto;
+  });
+
   protected readonly borrador = signal<Borrador>(VACIO);
   protected readonly guardando = signal(false);
 
@@ -197,6 +254,14 @@ export class Organico {
     return resultado;
   });
 
+  /** El organigrama: las cabezas (sin superior, o con uno que ya no existe) con sus subordinados debajo. */
+  protected readonly arbol = computed<Nodo[]>(() => {
+    const todos = this.todos() ?? [];
+    const ids = new Set(todos.map((p) => p.id));
+    const nodo = (p: Puesto): Nodo => ({ puesto: p, hijos: todos.filter((h) => h.superiorId === p.id).map(nodo) });
+    return todos.filter((p) => p.superiorId === null || !ids.has(p.superiorId)).map(nodo);
+  });
+
   /** Al editar, un puesto no puede depender de sí mismo ni de sus subordinados. */
   protected readonly posiblesSuperiores = computed(() => {
     const id = this.borrador().id;
@@ -207,6 +272,19 @@ export class Organico {
     }
     return (this.todos() ?? []).filter((p) => !debajo.has(p.id));
   });
+
+  protected seleccionar(p: Puesto) {
+    this.elegidoId.set(p.id);
+  }
+
+  /** El puesto del que depende `p`, si tiene. */
+  protected jefe(p: Puesto) {
+    return (this.todos() ?? []).find((x) => x.id === p.superiorId);
+  }
+
+  protected nombresDe(p: Puesto) {
+    return p.ocupantes.map((o) => o.nombres).join(', ');
+  }
 
   protected vacio(): Borrador {
     return VACIO;
