@@ -7,7 +7,7 @@ import type { Modalidad } from "../calculos.ts";
 import { consultar, ejecutar, filaACamel, uno } from "../db.ts";
 import type { Fila } from "../db.ts";
 import { parametrosDelAnio } from "../parametros.ts";
-import { buscarGrado } from "../escala.ts";
+import { buscarGrado, listarEscala } from "../escala.ts";
 import { CATEGORIAS_LOEP, indexarRegimenes, listarRegimenes, regimenAplicado } from "../regimenes.ts";
 import { aDecimal, cedulaValida, ErrorApi, fechaIsoValida } from "../validaciones.ts";
 
@@ -60,21 +60,27 @@ function validar(
     }
   }
 
-  // Grado de la escala salarial (opcional): debe ser de la escala del régimen que se aplica.
+  // Grado de la escala salarial: si el régimen que se aplica tiene escala, el grado es obligatorio
+  // y debe ser de esa escala; el sueldo sale de la tabla.
   let escalaId: number | null = null;
   const pedido = cuerpo.escalaId;
-  const grado = pedido === null || pedido === undefined || pedido === "" ? undefined : buscarGrado(db, Number(pedido));
-  if (pedido !== null && pedido !== undefined && pedido !== "") {
-    let aplicado: string | null = null;
+  const hayPedido = pedido !== null && pedido !== undefined && pedido !== "";
+  const grado = hayPedido ? buscarGrado(db, Number(pedido)) : undefined;
+  let aplicado: string | null = null;
+  if (elegido) {
     try {
-      aplicado = elegido ? regimenAplicado(indexarRegimenes(listarRegimenes(db)), regimen, categoriaLoep).codigo : null;
+      aplicado = regimenAplicado(indexarRegimenes(listarRegimenes(db)), regimen, categoriaLoep).codigo;
     } catch {
       /* la categoría faltante ya quedó reportada arriba */
     }
+  }
+  if (hayPedido) {
     if (!grado) errores.push("El grado de la escala salarial no existe.");
     else if (aplicado && grado.regimen !== aplicado) {
       errores.push(`El grado ${grado.grado} es de la escala ${grado.regimen}, no de ${aplicado}.`);
     } else escalaId = grado.id;
+  } else if (aplicado && listarEscala(db, aplicado).length > 0) {
+    errores.push(`Elige un grado de la escala salarial ${aplicado}: el sueldo se toma de la tabla del Ministerio del Trabajo.`);
   }
 
   // Opciones de pago: vacío = lo que diga el régimen.
@@ -107,7 +113,7 @@ function validar(
         avisos.push(`Aviso: el sueldo es menor al SBU ${parametros.anio} ($${parametros.sbu}).`);
       }
       if (grado && escalaId !== null && sueldoBase !== grado.rmu) {
-        avisos.push(`Aviso: el sueldo ($${sueldoBase}) difiere de la RMU del grado ${grado.grado} ($${grado.rmu}).`);
+        errores.push(`El sueldo ($${sueldoBase}) debe ser la RMU del grado ${grado.grado} ($${grado.rmu}).`);
       }
     }
   } catch (error) {

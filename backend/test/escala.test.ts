@@ -76,14 +76,14 @@ describe("empleados y escala salarial", () => {
       assert.deepEqual(r.json.avisos, []);
     }));
 
-  it("avisa, sin bloquear, si el sueldo difiere de la RMU del grado", () =>
+  it("rechaza un sueldo distinto de la RMU del grado", () =>
     conApi(async (api) => {
       const g5 = await gradoDe(api, 5);
       const r = await api.post("/api/empleados", {
         ...EMPLEADO, regimen: "LOSEP", sueldoBase: 700, escalaId: g5.id,
       });
-      assert.equal(r.status, 201);
-      assert.match(r.json.avisos[0], /difiere de la RMU del grado 5 \(\$675\)/);
+      assert.equal(r.status, 400);
+      assert.match(r.json.errores[0], /debe ser la RMU del grado 5 \(\$675\)/);
     }));
 
   it("un grado de otra escala se rechaza", () =>
@@ -108,9 +108,16 @@ describe("empleados y escala salarial", () => {
       assert.equal(obrero.status, 400);
     }));
 
-  it("sin grado, el sueldo es libre", () =>
+  it("un régimen con escala exige elegir un grado", () =>
     conApi(async (api) => {
       const r = await api.post("/api/empleados", { ...EMPLEADO, regimen: "LOSEP", escalaId: null });
+      assert.equal(r.status, 400);
+      assert.match(r.json.errores[0], /Elige un grado de la escala salarial LOSEP/);
+    }));
+
+  it("un régimen sin escala no pide grado y deja el sueldo libre", () =>
+    conApi(async (api) => {
+      const r = await api.post("/api/empleados", { ...EMPLEADO, regimen: "CODIGO_TRABAJO", escalaId: null });
       assert.equal(r.status, 201);
       assert.equal(r.json.escalaId, null);
     }));
@@ -127,7 +134,7 @@ describe("empleados y escala salarial", () => {
       assert.equal(despues.sueldoBase, g5.rmu);
     }));
 
-  it("en los datos de ejemplo, la asistente de la LOSEP está en el grado 5", () =>
+  it("en los datos de ejemplo, quien es servidor tiene su grado de la escala", () =>
     conApi(async (api) => {
       await api.post("/api/empleados/demo");
       const lucia = (await api.get("/api/empleados")).json.find((e: { nombres: string }) => e.nombres.startsWith("Lucía"));
