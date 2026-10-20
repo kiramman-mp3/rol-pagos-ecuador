@@ -1,11 +1,12 @@
 import { Router } from "express";
 import type { DatabaseSync } from "node:sqlite";
 
-import { calcularRol, FONDOS_RESERVA, IESS_PATRONAL, IESS_PERSONAL } from "../calculos.ts";
+import { calcularRol, REGLAS_CT_2026 } from "../calculos.ts";
 import { CONTRATOS, EMPRESA, MESES } from "../config.ts";
 import {
   aniosConParametros, guardarParametros, parametrosDelAnio, validarTablaIr,
 } from "../parametros.ts";
+import { reglasDe } from "../reglas.ts";
 import { aDecimal, ErrorApi } from "../validaciones.ts";
 
 export function rutasParametros(db: DatabaseSync): Router {
@@ -22,9 +23,9 @@ export function rutasParametros(db: DatabaseSync): Router {
       anios: aniosConParametros(db),
       sbu: parametros.sbu,
       fuente: parametros.fuente,
-      iessPersonal: IESS_PERSONAL.toNumber(),
-      iessPatronal: IESS_PATRONAL.toNumber(),
-      fondosReserva: FONDOS_RESERVA.toNumber(),
+      iessPersonal: Number(REGLAS_CT_2026.iessPersonal),
+      iessPatronal: Number(REGLAS_CT_2026.iessPatronal),
+      fondosReserva: Number(REGLAS_CT_2026.fondosReserva),
       fraccionExentaIr: parametros.tablaIr[0].hasta,
       tablaIr: parametros.tablaIr,
       empresa: EMPRESA,
@@ -70,16 +71,16 @@ export function rutasParametros(db: DatabaseSync): Router {
       }
     };
     const sueldoBase = campo("sueldo", 1, 100000, "Sueldo");
-    const horas50 = campo("horas50", 0, 100, "Horas suplementarias");
-    const horas100 = campo("horas100", 0, 100, "Horas extraordinarias");
+    const horasSuplementarias = campo("horasSuplementarias", 0, 100, "Horas suplementarias");
+    const horasExtraordinarias = campo("horasExtraordinarias", 0, 100, "Horas extraordinarias");
     const comisiones = campo("comisiones", 0, 100000, "Comisiones");
     if (errores.length) throw new ErrorApi(400, errores);
 
     res.json(
       calcularRol({
-        sueldoBase, horas50, horas100, comisiones,
+        sueldoBase, horasSuplementarias, horasExtraordinarias, comisiones,
         fechaIngreso: "2020-01-01", anio: 2026, mes: 10,
-      }),
+      }, reglasDe(parametrosDelAnio(db, 2026).parametros)),
     );
   });
 

@@ -81,7 +81,7 @@ describe('Landing', () => {
     const pedidos = http.match('/api/simulacion');
     const ultimo = pedidos[pedidos.length - 1];
     expect(ultimo.request.method).toBe('POST');
-    expect(ultimo.request.body).toEqual({ sueldo: 2000, horas50: 0 });
+    expect(ultimo.request.body).toEqual({ sueldo: 2000, horasSuplementarias: 0 });
     ultimo.flush(SIMULACION);
     await vi.advanceTimersByTimeAsync(0);
     TestBed.tick();

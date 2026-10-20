@@ -45,12 +45,12 @@ describe("API de roles", () => {
   it("aplica las novedades y las recuerda para el mismo período", () =>
     conDemo(async (api) => {
       // empleado 2 (Carlos, $1800): 10 h al 50% -> valor hora 7.5 -> 112.50
-      const novedades = [{ empleadoId: 2, horas50: 10, comisiones: 200, otrosDescuentos: 30 }];
+      const novedades = [{ empleadoId: 2, horasSuplementarias: 10, comisiones: 200, otrosDescuentos: 30 }];
       const { id } = (await generar(api, novedades)).json;
       const d = (await api.get(`/api/roles/${id}`)).json.detalle.find(
         (x: { empleadoId: number }) => x.empleadoId === 2,
       );
-      assert.equal(d.valorHoras50, 112.5);
+      assert.equal(d.valorHorasSuplementarias, 112.5);
       assert.equal(d.totalIngresos, 2112.5);
       assert.equal(d.otrosDescuentos, 30);
 
@@ -58,7 +58,32 @@ describe("API de roles", () => {
       assert.equal(periodo.existe, true);
       const carlos = periodo.empleados.find((e: { id: number }) => e.id === 2);
       assert.equal(carlos.novedades.comisiones, 200);
-      assert.equal(carlos.novedades.horas100, 0);
+      assert.equal(carlos.novedades.horasDescanso, 0);
+    }));
+
+  it("avisa, sin bloquear, cuando las horas pasan el tope del régimen", () =>
+    conDemo(async (api) => {
+      // Carlos (Código del Trabajo): el tope de referencia es 48 suplementarias al mes.
+      const r = await generar(api, [{ empleadoId: 2, horasSuplementarias: 60 }]);
+      assert.equal(r.status, 201);
+      assert.equal(r.json.avisos.length, 1);
+      assert.match(r.json.avisos[0], /Carlos.*suplementarias.*48/);
+      assert.deepEqual((await generar(api, [{ empleadoId: 2, horasSuplementarias: 10 }])).json.avisos, []);
+    }));
+
+  it("las horas extraordinarias se pagan y se recuerdan por separado", () =>
+    conDemo(async (api) => {
+      // Carlos, $1800: valor hora 7.5; 4 h extraordinarias al 100% = 60
+      const { id } = (await generar(api, [{ empleadoId: 2, horasExtraordinarias: 4 }])).json;
+      const d = (await api.get(`/api/roles/${id}`)).json.detalle.find(
+        (x: { empleadoId: number }) => x.empleadoId === 2,
+      );
+      assert.equal(d.valorHorasExtraordinarias, 60);
+      assert.equal(d.valorHorasSuplementarias, 0);
+      const carlos = (await api.get("/api/roles/periodo/2026/10")).json.empleados.find(
+        (e: { id: number }) => e.id === 2,
+      );
+      assert.equal(carlos.novedades.horasExtraordinarias, 4);
     }));
 
   it("volver a generar reemplaza el rol del mes", () =>
@@ -88,7 +113,7 @@ describe("API de roles", () => {
 
   it("una novedad inválida no genera nada", () =>
     conDemo(async (api) => {
-      const r = await generar(api, [{ empleadoId: 1, horas50: "abc" }]);
+      const r = await generar(api, [{ empleadoId: 1, horasSuplementarias: "abc" }]);
       assert.equal(r.status, 400);
       assert.match(r.json.errores[0], /María/);
       assert.equal((await api.get("/api/roles")).json.length, 0);
@@ -155,7 +180,7 @@ describe("API de parámetros y simulación", () => {
     const api = await iniciar();
     try {
       assert.equal((await api.post("/api/simulacion", { sueldo: -5 })).status, 400);
-      assert.equal((await api.post("/api/simulacion", { sueldo: 2000, horas50: 500 })).status, 400);
+      assert.equal((await api.post("/api/simulacion", { sueldo: 2000, horasSuplementarias: 500 })).status, 400);
       assert.equal((await api.post("/api/simulacion", {})).status, 400);
     } finally {
       api.cerrar();

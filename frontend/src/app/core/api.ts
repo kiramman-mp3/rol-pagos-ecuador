@@ -12,8 +12,9 @@ import type {
 /** Lo que se digita en la grilla: texto de los campos, vacío = 0. */
 export interface NovedadEnviada {
   empleadoId: number;
-  horas50: string;
-  horas100: string;
+  horasSuplementarias: string;
+  horasExtraordinarias: string;
+  horasDescanso: string;
   horasNocturnas: string;
   comisiones: string;
   otrosDescuentos: string;
@@ -52,7 +53,7 @@ export class Api {
   }
 
   generarRol(anio: number, mes: number, novedades: NovedadEnviada[]) {
-    return this.http.post<{ id: number; empleados: number }>('/api/roles/generar', {
+    return this.http.post<{ id: number; empleados: number; avisos: string[] }>('/api/roles/generar', {
       anio,
       mes,
       novedades,

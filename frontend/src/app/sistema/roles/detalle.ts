@@ -183,7 +183,7 @@ import type { RolCompleto, RolDetalle } from '../../core/modelos';
         </div>
         <div class="hoja-cuerpo pequeno apoyo">
           El décimo cuarto se calcula sobre el sueldo básico unificado ({{ parametros()?.sbu | dinero }}), el tercero
-          sobre el total de ingresos, las vacaciones sobre el sueldo (1/24) y los fondos de reserva (8.33%) desde el
+          sobre el total de ingresos, las vacaciones sobre el ingreso con horas extras (1/24) y los fondos de reserva (8.33%) desde el
           mes 13. El costo del empleador es el total de ingresos más estas provisiones.
         </div>
       </section>
@@ -230,7 +230,9 @@ export class DetalleRol {
   });
 
   protected horasExtra(d: RolDetalle): number {
-    return sumar([d.valorHoras50, d.valorHoras100, d.valorRecargoNocturno]);
+    return sumar([
+      d.valorHorasSuplementarias, d.valorHorasExtraordinarias, d.valorHorasDescanso, d.valorRecargoNocturno,
+    ]);
   }
 
   protected imprimir() {

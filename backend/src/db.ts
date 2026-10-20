@@ -84,10 +84,10 @@ export function transaccion<T>(db: DatabaseSync, trabajo: () => T): T {
   }
 }
 
-/** sueldo_base -> sueldoBase, horas_50 -> horas50 */
+/** sueldo_base -> sueldoBase, horas_suplementarias -> horasSuplementarias */
 export const aCamel = (clave: string) => clave.replace(/_([a-z0-9])/g, (_, c: string) => c.toUpperCase());
 
-/** sueldoBase -> sueldo_base, horas50 -> horas_50 */
+/** sueldoBase -> sueldo_base, horasSuplementarias -> horas_suplementarias */
 export const aSnake = (clave: string) =>
   clave.replace(/([A-Z])/g, (c) => `_${c.toLowerCase()}`).replace(/([a-z])([0-9])/g, "$1_$2");
 

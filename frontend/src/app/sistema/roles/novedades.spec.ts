@@ -9,7 +9,7 @@ import { NovedadesMes } from './novedades';
 @Component({ template: '' })
 class Vacio {}
 
-const SIN_NOVEDADES = { horas50: 0, horas100: 0, horasNocturnas: 0, comisiones: 0, otrosDescuentos: 0 };
+const SIN_NOVEDADES = { horasSuplementarias: 0, horasExtraordinarias: 0, horasDescanso: 0, horasNocturnas: 0, comisiones: 0, otrosDescuentos: 0 };
 const PERIODO = {
   anio: 2026, mes: 10, existe: true,
   empleados: [{ id: 1, nombres: 'Ana Prueba', cargo: 'Analista', sueldoBase: 1000, novedades: SIN_NOVEDADES }],
@@ -54,7 +54,7 @@ describe('NovedadesMes', () => {
     const envio = http.expectOne('/api/roles/generar');
     expect(envio.request.body).toEqual({
       anio: 2026, mes: 10,
-      novedades: [{ empleadoId: 1, horas50: '', horas100: '', horasNocturnas: '', comisiones: '200', otrosDescuentos: '' }],
+      novedades: [{ empleadoId: 1, horasSuplementarias: '', horasExtraordinarias: '', horasDescanso: '', horasNocturnas: '', comisiones: '200', otrosDescuentos: '' }],
     });
     envio.flush({ id: 7, empleados: 1 });
     await new Promise((resolver) => setTimeout(resolver));

@@ -22,14 +22,14 @@ export class Landing {
   protected readonly sueldo = signal('1200');
   protected readonly horas = signal('');
   /** Espera a que termine de escribir para no consultar en cada tecla. */
-  private readonly consulta = signal({ sueldo: 1200, horas50: 0 });
+  private readonly consulta = signal({ sueldo: 1200, horasSuplementarias: 0 });
 
   protected readonly entradaValida = computed(() => this.consulta().sueldo > 0);
 
   protected readonly simulacion = httpResource<ResultadoRol>(() => {
     const c = this.consulta();
     if (c.sueldo <= 0) return undefined;
-    return { url: '/api/simulacion', method: 'POST', body: { sueldo: c.sueldo, horas50: c.horas50 } };
+    return { url: '/api/simulacion', method: 'POST', body: { sueldo: c.sueldo, horasSuplementarias: c.horasSuplementarias } };
   });
 
   protected readonly resultado = valorSeguro(this.simulacion);
@@ -37,9 +37,9 @@ export class Landing {
   constructor() {
     effect((alLimpiar) => {
       const sueldo = Number(this.sueldo().replace(',', '.'));
-      const horas50 = Number(this.horas().replace(',', '.')) || 0;
+      const horasSuplementarias = Number(this.horas().replace(',', '.')) || 0;
       const temporizador = setTimeout(
-        () => this.consulta.set({ sueldo: Number.isFinite(sueldo) ? sueldo : 0, horas50 }),
+        () => this.consulta.set({ sueldo: Number.isFinite(sueldo) ? sueldo : 0, horasSuplementarias }),
         250,
       );
       alLimpiar(() => clearTimeout(temporizador));

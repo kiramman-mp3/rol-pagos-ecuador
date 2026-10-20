@@ -45,14 +45,17 @@ import type { RolCompleto } from '../../core/modelos';
                   <td>Sueldo@if (d.diasTrabajados < 30) { ({{ d.diasTrabajados }} días)}</td>
                   <td class="num">{{ d.sueldo | dinero }}</td>
                 </tr>
-                @if (d.horas50) {
-                  <tr><td>Horas suplementarias al 50% ({{ d.horas50 }} h)</td><td class="num">{{ d.valorHoras50 | dinero }}</td></tr>
+                @if (d.horasSuplementarias) {
+                  <tr><td>Horas suplementarias ({{ d.horasSuplementarias }} h)</td><td class="num">{{ d.valorHorasSuplementarias | dinero }}</td></tr>
                 }
-                @if (d.horas100) {
-                  <tr><td>Horas extraordinarias al 100% ({{ d.horas100 }} h)</td><td class="num">{{ d.valorHoras100 | dinero }}</td></tr>
+                @if (d.horasExtraordinarias) {
+                  <tr><td>Horas extraordinarias ({{ d.horasExtraordinarias }} h)</td><td class="num">{{ d.valorHorasExtraordinarias | dinero }}</td></tr>
+                }
+                @if (d.horasDescanso) {
+                  <tr><td>Horas en sábado, domingo o feriado ({{ d.horasDescanso }} h)</td><td class="num">{{ d.valorHorasDescanso | dinero }}</td></tr>
                 }
                 @if (d.horasNocturnas) {
-                  <tr><td>Recargo nocturno del 25% ({{ d.horasNocturnas }} h)</td><td class="num">{{ d.valorRecargoNocturno | dinero }}</td></tr>
+                  <tr><td>Recargo nocturno ({{ d.horasNocturnas }} h)</td><td class="num">{{ d.valorRecargoNocturno | dinero }}</td></tr>
                 }
                 @if (d.comisiones) {
                   <tr><td>Comisiones y bonos</td><td class="num">{{ d.comisiones | dinero }}</td></tr>
