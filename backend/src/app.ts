@@ -25,7 +25,7 @@ export function crearApp({ rutaBase, carpetaFrontend }: Opciones) {
 
   app.use("/api/empleados", rutasEmpleados(db));
   app.use("/api/roles", rutasRoles(db));
-  app.use("/api", rutasParametros());
+  app.use("/api", rutasParametros(db));
   app.use("/api", (_req, _res, next) => next(new ErrorApi(404, ["Ruta no encontrada."])));
 
   // En producción, Express también entrega la aplicación Angular.

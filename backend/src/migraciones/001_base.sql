@@ -1,4 +1,4 @@
--- Esquema mínimo: 3 tablas del enunciado + novedades (insumos manuales del mes).
+-- Esquema base: 3 tablas del enunciado + novedades (insumos manuales del mes).
 
 CREATE TABLE IF NOT EXISTS empleados (
     id            INTEGER PRIMARY KEY AUTOINCREMENT,
