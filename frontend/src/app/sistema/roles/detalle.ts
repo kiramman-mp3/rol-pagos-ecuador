@@ -79,16 +79,16 @@ import type { Modalidad, PlanillaIess, RolCompleto, RolDetalle } from '../../cor
                 <th rowspan="2">Empleado</th>
                 <th colspan="5" class="g-ingresos t-ingresos corte">Ingresos</th>
                 <th colspan="4" class="g-descuentos t-descuentos corte">Descuentos</th>
-                <th rowspan="2" class="num g-neto c-neto corte">Neto a recibir</th>
+                <th rowspan="2" class="num g-neto c-neto corte"><span class="th-largo">Neto a recibir</span><span class="th-corto" aria-hidden="true">Neto</span></th>
               </tr>
               <tr>
                 <th class="num corte">Sueldo</th>
-                <th class="num">Horas extra</th>
+                <th class="num"><span class="th-largo">Horas extra</span><span class="th-corto" aria-hidden="true">H. extra</span></th>
                 <th class="num">Comisiones</th>
-                <th class="num" title="Décimos y fondos de reserva que se pagan dentro del rol">Décimos y fondos</th>
+                <th class="num" title="Décimos y fondos de reserva que se pagan dentro del rol"><span class="th-largo">Décimos y fondos</span><span class="th-corto" aria-hidden="true">Déc. y fondos</span></th>
                 <th class="num">Total</th>
-                <th class="num corte">Aporte IESS</th>
-                <th class="num">Impuesto a la renta</th>
+                <th class="num corte"><span class="th-largo">Aporte IESS</span><span class="th-corto" aria-hidden="true">IESS</span></th>
+                <th class="num"><span class="th-largo">Impuesto a la renta</span><span class="th-corto" aria-hidden="true">IR</span></th>
                 <th class="num">Otros</th>
                 <th class="num">Total</th>
               </tr>
@@ -151,13 +151,13 @@ import type { Modalidad, PlanillaIess, RolCompleto, RolDetalle } from '../../cor
             <thead>
               <tr>
                 <th class="g-provision">Empleado</th>
-                <th class="num g-provision">Décimo tercero</th>
-                <th class="num g-provision">Décimo cuarto</th>
+                <th class="num g-provision"><span class="th-largo">Décimo tercero</span><span class="th-corto" aria-hidden="true">13.º</span></th>
+                <th class="num g-provision"><span class="th-largo">Décimo cuarto</span><span class="th-corto" aria-hidden="true">14.º</span></th>
                 <th class="num g-provision">Vacaciones</th>
-                <th class="num g-provision">Fondos de reserva</th>
-                <th class="num g-provision">Aporte patronal</th>
-                <th class="num g-provision">Total provisiones</th>
-                <th class="num">Costo empleador</th>
+                <th class="num g-provision"><span class="th-largo">Fondos de reserva</span><span class="th-corto" aria-hidden="true">Fondos</span></th>
+                <th class="num g-provision"><span class="th-largo">Aporte patronal</span><span class="th-corto" aria-hidden="true">Patronal</span></th>
+                <th class="num g-provision"><span class="th-largo">Total provisiones</span><span class="th-corto" aria-hidden="true">Total</span></th>
+                <th class="num"><span class="th-largo">Costo empleador</span><span class="th-corto" aria-hidden="true">Costo</span></th>
               </tr>
             </thead>
             <tbody>
@@ -229,12 +229,12 @@ import type { Modalidad, PlanillaIess, RolCompleto, RolDetalle } from '../../cor
               <thead>
                 <tr>
                   <th>Empleado</th>
-                  <th class="num">Materia gravada</th>
-                  <th class="num">Aporte personal</th>
-                  <th class="num">Aporte patronal</th>
-                  <th class="num">Total aportes</th>
-                  <th class="num" title="Fondos de reserva que el trabajador acumula: se depositan en el IESS">Fondos a depositar</th>
-                  <th class="num" title="Fondos de reserva que ya se pagaron en el rol">Fondos pagados en el rol</th>
+                  <th class="num"><span class="th-largo">Materia gravada</span><span class="th-corto" aria-hidden="true">Gravada</span></th>
+                  <th class="num"><span class="th-largo">Aporte personal</span><span class="th-corto" aria-hidden="true">Personal</span></th>
+                  <th class="num"><span class="th-largo">Aporte patronal</span><span class="th-corto" aria-hidden="true">Patronal</span></th>
+                  <th class="num"><span class="th-largo">Total aportes</span><span class="th-corto" aria-hidden="true">Total</span></th>
+                  <th class="num" title="Fondos de reserva que el trabajador acumula: se depositan en el IESS"><span class="th-largo">Fondos a depositar</span><span class="th-corto" aria-hidden="true">A depositar</span></th>
+                  <th class="num" title="Fondos de reserva que ya se pagaron en el rol"><span class="th-largo">Fondos pagados en el rol</span><span class="th-corto" aria-hidden="true">Pagados en rol</span></th>
                 </tr>
               </thead>
               <tbody>

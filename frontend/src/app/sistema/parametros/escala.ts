@@ -55,7 +55,7 @@ const VACIO: Borrador = { id: null, grado: '', denominacion: '', rmu: '', rmuMax
               <tr>
                 <th class="num">Grado</th>
                 <th>Puesto</th>
-                <th class="num">Remuneración mensual</th>
+                <th class="num"><span class="th-largo">Remuneración mensual</span><span class="th-corto" aria-hidden="true">Remuneración</span></th>
                 <th>Fuente</th>
                 <th><span class="solo-lectura">Acciones</span></th>
               </tr>

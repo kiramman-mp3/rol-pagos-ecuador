@@ -37,7 +37,7 @@ import type { Empleado } from '../../core/modelos';
               <th>Régimen</th>
               <th>Contrato</th>
               <th>Ingreso</th>
-              <th class="num">Sueldo base</th>
+              <th class="num"><span class="th-largo">Sueldo base</span><span class="th-corto" aria-hidden="true">Sueldo</span></th>
               <th>Estado</th>
               <th><span class="solo-lectura">Acciones</span></th>
             </tr>

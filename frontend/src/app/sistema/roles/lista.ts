@@ -49,8 +49,8 @@ import type { RolCabecera } from '../../core/modelos';
               <th class="num">Empleados</th>
               <th class="num t-ingresos">Ingresos</th>
               <th class="num t-descuentos">Descuentos</th>
-              <th class="num t-neto">Neto a pagar</th>
-              <th class="num">Costo empleador</th>
+              <th class="num t-neto"><span class="th-largo">Neto a pagar</span><span class="th-corto" aria-hidden="true">Neto</span></th>
+              <th class="num"><span class="th-largo">Costo empleador</span><span class="th-corto" aria-hidden="true">Costo</span></th>
               <th><span class="solo-lectura">Acciones</span></th>
             </tr>
           </thead>

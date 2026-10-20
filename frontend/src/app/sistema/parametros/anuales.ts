@@ -74,8 +74,8 @@ interface FilaTramo {
                     <tr>
                       <th class="num">Desde (USD)</th>
                       <th class="num">Hasta (USD)</th>
-                      <th class="num">Impuesto de la fracción básica (USD)</th>
-                      <th class="num">Sobre el excedente (%)</th>
+                      <th class="num"><span class="th-largo">Impuesto de la fracción básica (USD)</span><span class="th-corto" aria-hidden="true">Imp. fracción</span></th>
+                      <th class="num"><span class="th-largo">Sobre el excedente (%)</span><span class="th-corto" aria-hidden="true">Excedente %</span></th>
                       <th><span class="solo-lectura">Quitar</span></th>
                     </tr>
                   </thead>
