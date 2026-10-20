@@ -5,7 +5,7 @@ import { RouterLink } from '@angular/router';
 
 import { ParametrosLey, valorSeguro } from '../../core/api';
 import { DineroPipe } from '../../core/dinero.pipe';
-import type { RolCompleto, RolDetalle } from '../../core/modelos';
+import type { Modalidad, RolCompleto, RolDetalle } from '../../core/modelos';
 import { etiquetaRegimen } from '../../core/regimen';
 
 /** Comprobante individual, pensado para imprimirse en una sola hoja. */
@@ -63,6 +63,15 @@ import { etiquetaRegimen } from '../../core/regimen';
                 @if (d.comisiones) {
                   <tr><td>Comisiones y bonos</td><td class="num">{{ d.comisiones | dinero }}</td></tr>
                 }
+                @if (d.decimoTerceroModalidad === 'mensual') {
+                  <tr><td>Décimo tercer sueldo (pagado en el rol)</td><td class="num">{{ d.decimoTercero | dinero }}</td></tr>
+                }
+                @if (d.decimoCuartoModalidad === 'mensual') {
+                  <tr><td>Décimo cuarto sueldo (pagado en el rol)</td><td class="num">{{ d.decimoCuarto | dinero }}</td></tr>
+                }
+                @if (d.fondosReservaModalidad === 'mensual' && d.fondosReserva) {
+                  <tr><td>Fondos de reserva (pagados en el rol)</td><td class="num">{{ d.fondosReserva | dinero }}</td></tr>
+                }
               </tbody>
               <tfoot>
                 <tr><td>Total ingresos</td><td class="num">{{ d.totalIngresos | dinero }}</td></tr>
@@ -107,10 +116,19 @@ import { etiquetaRegimen } from '../../core/regimen';
               </tr>
             </thead>
             <tbody>
-              <tr><td>Décimo tercer sueldo</td><td class="num">{{ d.decimoTercero | dinero }}</td></tr>
-              <tr><td>Décimo cuarto sueldo</td><td class="num">{{ d.decimoCuarto | dinero }}</td></tr>
+              <tr>
+                <td>Décimo tercer sueldo</td>
+                <td class="num">{{ d.decimoTerceroModalidad === 'acumulado' ? (d.decimoTercero | dinero) : pagado(d.decimoTerceroModalidad) }}</td>
+              </tr>
+              <tr>
+                <td>Décimo cuarto sueldo</td>
+                <td class="num">{{ d.decimoCuartoModalidad === 'acumulado' ? (d.decimoCuarto | dinero) : pagado(d.decimoCuartoModalidad) }}</td>
+              </tr>
               <tr><td>Vacaciones</td><td class="num">{{ d.vacaciones | dinero }}</td></tr>
-              <tr><td>Fondos de reserva</td><td class="num">{{ d.fondosReserva | dinero }}</td></tr>
+              <tr>
+                <td>Fondos de reserva</td>
+                <td class="num">{{ d.fondosReservaModalidad === 'acumulado' ? (d.fondosReserva | dinero) : pagado(d.fondosReservaModalidad) }}</td>
+              </tr>
               <tr><td>Aporte patronal al IESS ({{ d.tasaIessPatronal | percent: '1.2-2' }})</td><td class="num">{{ d.aportePatronal | dinero }}</td></tr>
             </tbody>
           </table>
@@ -144,6 +162,10 @@ export class Boleta {
   protected readonly nombreMes = computed(
     () => this.parametros()?.meses[(this.datos()?.mes ?? 1) - 1] ?? '',
   );
+
+  protected pagado(modalidad: Modalidad): string {
+    return modalidad === 'mensual' ? 'Pagado en el rol' : 'No recibe';
+  }
 
   protected regimen(d: RolDetalle): string {
     return etiquetaRegimen(this.parametros()?.regimenes, d.regimen, d.regimenAplicado);

@@ -6,9 +6,12 @@ import {
   diasTrabajados,
   impuestoRentaAnual,
   mesesDeServicio,
+  OPCIONES_ACUMULADAS,
   REGLAS_CT_2026,
+  avisoHorasIgnoradas,
   avisosDeTopes,
 } from "../src/calculos.ts";
+import type { OpcionesRol } from "../src/calculos.ts";
 
 const ANTIGUO = "2020-01-15";
 
@@ -173,6 +176,95 @@ describe("reglas inyectadas", () => {
     const entrada = { ...base, fechaIngreso: "2026-04-01" }; // 6 meses de servicio
     assert.equal(calcularRol(entrada).fondosReserva, 0);
     assert.equal(calcularRol(entrada, { ...REGLAS_CT_2026, mesesParaFondos: 6 }).fondosReserva, 166.6);
+  });
+});
+
+describe("beneficios: no, mensual o acumulado", () => {
+  const base = { sueldoBase: 2000, fechaIngreso: ANTIGUO, anio: 2026, mes: 10 };
+  const con = (cambios: Partial<OpcionesRol>) => calcularRol(base, REGLAS_CT_2026, { ...OPCIONES_ACUMULADAS, ...cambios });
+  const MENSUALES: Partial<OpcionesRol> = { decimoTercero: "mensual", decimoCuarto: "mensual", fondosReserva: "mensual" };
+
+  it("sin opciones todo se provisiona, como antes", () => {
+    const r = calcularRol(base);
+    assert.equal(r.beneficiosMensuales, 0);
+    assert.equal(r.decimoTerceroModalidad, "acumulado");
+    assert.equal(r.totalIngresos, 2000);
+  });
+
+  it("mensual: se paga en el rol y sube el neto, sin tocar IESS ni impuesto", () => {
+    const r = con(MENSUALES);
+    assert.equal(r.ingresosAportables, 2000);
+    assert.equal(r.decimoTercero, 166.67);
+    assert.equal(r.decimoCuarto, 40.17);
+    assert.equal(r.fondosReserva, 166.6);
+    assert.equal(r.beneficiosMensuales, 373.44);
+    assert.equal(r.totalIngresos, 2373.44);
+    assert.equal(r.aporteIess, 189); // sobre 2000, no sobre 2373.44
+    assert.equal(r.impuestoRenta, 68.02); // igual que sin los beneficios
+    assert.equal(r.netoPagar, 2116.42); // 2373.44 - 257.02
+  });
+
+  it("mensual: ya no se provisionan, solo quedan vacaciones y aporte patronal", () => {
+    const r = con(MENSUALES);
+    assert.equal(r.totalProvisiones, 306.33); // 83.33 + 223
+    assert.equal(r.costoEmpleador, 2679.77); // 2373.44 + 306.33
+  });
+
+  it("acumulado: el neto es el del sueldo y los beneficios quedan como provisión", () => {
+    const r = con({});
+    assert.equal(r.netoPagar, 1742.98);
+    assert.equal(r.totalProvisiones, 679.77); // 166.67 + 40.17 + 83.33 + 166.6 + 223
+  });
+
+  it("no: el beneficio no se paga ni se provisiona", () => {
+    const r = con({ decimoTercero: "no", decimoCuarto: "no", fondosReserva: "no" });
+    assert.equal(r.decimoTercero, 0);
+    assert.equal(r.decimoCuarto, 0);
+    assert.equal(r.fondosReserva, 0);
+    assert.equal(r.totalIngresos, 2000);
+    assert.equal(r.totalProvisiones, 306.33);
+    assert.equal(r.decimoTerceroModalidad, "no");
+  });
+
+  it("cada beneficio puede tener su propia modalidad", () => {
+    const r = con({ decimoTercero: "mensual", decimoCuarto: "acumulado", fondosReserva: "no" });
+    assert.equal(r.totalIngresos, 2166.67); // 2000 + décimo tercero
+    assert.equal(r.totalProvisiones, 346.5); // 40.17 + 83.33 + 223
+  });
+
+  it("el fondo de reserva mensual no aparece antes de los 12 meses de servicio", () => {
+    const nuevo = { ...base, fechaIngreso: "2026-04-01" };
+    const r = calcularRol(nuevo, REGLAS_CT_2026, { ...OPCIONES_ACUMULADAS, fondosReserva: "mensual" });
+    assert.equal(r.fondosReserva, 0);
+    assert.equal(r.beneficiosMensuales, 0);
+  });
+
+  it("el décimo cuarto mensual del mes de ingreso es proporcional", () => {
+    const r = calcularRol(
+      { ...base, sueldoBase: 1000, fechaIngreso: "2026-10-16" }, REGLAS_CT_2026,
+      { ...OPCIONES_ACUMULADAS, decimoCuarto: "mensual" },
+    );
+    assert.equal(r.decimoCuarto, 20.08);
+    assert.equal(r.beneficiosMensuales, 20.08);
+  });
+
+  it("sin horas extras, las horas digitadas no se pagan pero el recargo nocturno sí", () => {
+    const r = calcularRol(
+      { ...base, sueldoBase: 960, horasSuplementarias: 10, horasExtraordinarias: 5, horasDescanso: 5, horasNocturnas: 20 },
+      REGLAS_CT_2026, { ...OPCIONES_ACUMULADAS, recibeHorasExtras: false },
+    );
+    assert.equal(r.horasSuplementarias, 0);
+    assert.equal(r.valorHorasSuplementarias, 0);
+    assert.equal(r.valorHorasExtraordinarias, 0);
+    assert.equal(r.valorHorasDescanso, 0);
+    assert.equal(r.valorRecargoNocturno, 20);
+    assert.equal(r.totalIngresos, 980);
+  });
+
+  it("avisoHorasIgnoradas avisa solo si había horas", () => {
+    assert.deepEqual(avisoHorasIgnoradas("Ana", { horasSuplementarias: 0, horasExtraordinarias: 0, horasDescanso: 0 }), []);
+    const avisos = avisoHorasIgnoradas("Ana", { horasSuplementarias: 4, horasExtraordinarias: 0, horasDescanso: 2 });
+    assert.match(avisos[0], /Ana.*no recibe horas extras.*6 horas/);
   });
 });
 

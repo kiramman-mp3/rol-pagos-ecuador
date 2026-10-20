@@ -26,7 +26,7 @@ const PARAMETROS = {
 
 const SIMULACION = {
   totalIngresos: 2000, totalDescuentos: 257.02, netoPagar: 1742.98, aporteIess: 189,
-  impuestoRenta: 68.02, costoEmpleador: 2589.77,
+  impuestoRenta: 68.02, costoEmpleador: 2589.77, beneficiosMensuales: 373.44,
   regimenAplicado: 'Código del Trabajo', tasaIessPersonal: 0.0945, tasaIessPatronal: 0.1115,
 };
 
@@ -93,7 +93,7 @@ describe('Landing', () => {
     const ultimo = pedidos[pedidos.length - 1];
     expect(ultimo.request.method).toBe('POST');
     expect(ultimo.request.body).toEqual({
-      sueldo: 2000, horasSuplementarias: 0, regimen: 'CODIGO_TRABAJO',
+      sueldo: 2000, horasSuplementarias: 0, regimen: 'CODIGO_TRABAJO', decimos: 'mensual',
     });
     ultimo.flush(SIMULACION);
     await vi.advanceTimersByTimeAsync(0);
@@ -136,8 +136,26 @@ describe('Landing', () => {
     TestBed.tick();
     const pedidos = http.match('/api/simulacion');
     expect(pedidos[pedidos.length - 1].request.body).toEqual({
-      sueldo: 1200, horasSuplementarias: 0, regimen: 'LOEP', categoriaLoep: 'servidor',
+      sueldo: 1200, horasSuplementarias: 0, regimen: 'LOEP', categoriaLoep: 'servidor', decimos: 'mensual',
     });
+  });
+
+  it('el simulador envía si los décimos se pagan, se acumulan o no se reciben', async () => {
+    vi.useFakeTimers();
+    const fixture = crear();
+    const el = fixture.nativeElement as HTMLElement;
+    responderInicio();
+    await vi.advanceTimersByTimeAsync(0);
+    TestBed.tick();
+    fixture.detectChanges();
+
+    const selector = el.querySelector<HTMLSelectElement>('#sim-decimos')!;
+    selector.value = 'acumulado';
+    selector.dispatchEvent(new Event('change'));
+    await vi.advanceTimersByTimeAsync(300);
+    TestBed.tick();
+    const pedidos = http.match('/api/simulacion');
+    expect(pedidos[pedidos.length - 1].request.body.decimos).toBe('acumulado');
   });
 
   it('si el servidor no responde, la página sigue funcionando y lo explica', async () => {

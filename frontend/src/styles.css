@@ -178,6 +178,9 @@ th.c-neto { background: var(--neto-fondo); }
 .campo .ayuda { font-size: .82rem; color: var(--tinta-suave); }
 .campo.c2 { grid-column: span 2; } .campo.c3 { grid-column: span 3; } .campo.c4 { grid-column: span 4; }
 .formulario .acciones { grid-column: 1 / -1; margin-top: .5rem; }
+.beneficios { border: 1px solid var(--linea); border-radius: var(--radio); padding: 1rem; margin: 0; min-width: 0; }
+.beneficios legend { font-weight: 600; padding: 0 .4rem; }
+.rejilla-beneficios { display: grid; grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr)); gap: 1rem; }
 .entrada {
   font: 400 1rem var(--cuerpo); font-variant-numeric: tabular-nums;
   color: var(--tinta); background: #fff; width: 100%;

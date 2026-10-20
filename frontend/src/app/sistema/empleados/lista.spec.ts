@@ -9,6 +9,7 @@ import { ListaEmpleados } from './lista';
 const ANA: Empleado = {
   id: 1, cedula: '1801234566', nombres: 'Ana Prueba', cargo: 'Analista', sueldoBase: 1000,
   fechaIngreso: '2024-01-10', tipoContrato: 'Indefinido', regimen: 'CODIGO_TRABAJO', categoriaLoep: null, escalaId: null,
+  pagoDecimoTercero: null, pagoDecimoCuarto: null, pagoFondosReserva: null, recibeHorasExtras: null,
   activo: true,
 };
 

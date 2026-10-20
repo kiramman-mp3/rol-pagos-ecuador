@@ -2,14 +2,14 @@ import { Router } from "express";
 import type { DatabaseSync } from "node:sqlite";
 import { Decimal } from "decimal.js";
 
-import { avisosDeTopes, calcularRol } from "../calculos.ts";
+import { avisoHorasIgnoradas, avisosDeTopes, calcularRol } from "../calculos.ts";
 import type { ResultadoRol } from "../calculos.ts";
 import {
   aSnake, consultar, ejecutar, filaACamel, transaccion, uno,
 } from "../db.ts";
 import type { Fila } from "../db.ts";
 import { parametrosDelAnio } from "../parametros.ts";
-import { indexarRegimenes, listarRegimenes, regimenAplicado, reglasDe } from "../regimenes.ts";
+import { indexarRegimenes, listarRegimenes, opcionesDe, regimenAplicado, reglasDe } from "../regimenes.ts";
 import { aDecimal, ErrorApi } from "../validaciones.ts";
 
 const CAMPOS_NOVEDAD = [
@@ -52,6 +52,7 @@ function guardarRol(
     const n = novedades.get(Number(e.id));
     const aplicado = regimenAplicado(regimenes, String(e.regimen), e.categoria_loep as string | null);
     const reglas = reglasDe(parametros, aplicado);
+    const opciones = opcionesDe(aplicado, e);
     const resultado = calcularRol({
       sueldoBase: String(e.sueldo_base),
       fechaIngreso: String(e.fecha_ingreso),
@@ -62,13 +63,15 @@ function guardarRol(
       horasNocturnas: n?.horasNocturnas ?? cero,
       comisiones: n?.comisiones ?? cero,
       otrosDescuentos: n?.otrosDescuentos ?? cero,
-    }, reglas);
-    return { e, resultado, n, aplicado, reglas };
+    }, reglas, opciones);
+    return { e, resultado, n, aplicado, reglas, opciones };
   });
 
-  const avisos = calculos.flatMap(({ e, n, reglas }) =>
-    n ? avisosDeTopes(String(e.nombres), n, reglas) : [],
-  );
+  const avisos = calculos.flatMap(({ e, n, reglas, opciones }) => {
+    if (!n) return [];
+    const nombre = String(e.nombres);
+    return opciones.recibeHorasExtras ? avisosDeTopes(nombre, n, reglas) : avisoHorasIgnoradas(nombre, n);
+  });
   if (!exacto) avisos.unshift(`No hay parámetros de ${anio}; se usaron los de ${parametros.anio}.`);
 
   const total = (campo: keyof ResultadoRol) =>
@@ -118,9 +121,11 @@ function guardarRol(
 
 const COLUMNAS_CSV = [
   "cedula", "nombres", "cargo", "regimen_aplicado", "sueldo", "valor_horas_suplementarias",
-  "valor_horas_extraordinarias", "valor_horas_descanso", "valor_recargo_nocturno", "comisiones", "total_ingresos", "aporte_iess", "impuesto_renta",
-  "otros_descuentos", "total_descuentos", "neto_pagar", "decimo_tercero", "decimo_cuarto",
-  "vacaciones", "fondos_reserva", "aporte_patronal", "costo_empleador",
+  "valor_horas_extraordinarias", "valor_horas_descanso", "valor_recargo_nocturno", "comisiones",
+  "ingresos_aportables", "beneficios_mensuales", "total_ingresos", "aporte_iess", "impuesto_renta",
+  "otros_descuentos", "total_descuentos", "neto_pagar", "decimo_tercero", "decimo_tercero_modalidad",
+  "decimo_cuarto", "decimo_cuarto_modalidad", "fondos_reserva", "fondos_reserva_modalidad",
+  "vacaciones", "aporte_patronal", "costo_empleador",
 ];
 
 // Excel abre el CSV en UTF-8 solo si empieza con esta marca.
@@ -166,6 +171,9 @@ export function rutasRoles(db: DatabaseSync): Router {
           id: e.id, nombres: e.nombres, cargo: e.cargo, sueldoBase: e.sueldo_base,
           regimen: e.regimen,
           regimenAplicado: regimenAplicado(regimenes, String(e.regimen), e.categoria_loep as string | null).codigo,
+          recibeHorasExtras: opcionesDe(
+            regimenAplicado(regimenes, String(e.regimen), e.categoria_loep as string | null), e,
+          ).recibeHorasExtras,
           novedades: {
             horasSuplementarias: g?.horas_suplementarias ?? 0,
             horasExtraordinarias: g?.horas_extraordinarias ?? 0,

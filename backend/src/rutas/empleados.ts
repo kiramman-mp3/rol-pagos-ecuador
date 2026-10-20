@@ -2,6 +2,8 @@ import { Router } from "express";
 import type { DatabaseSync } from "node:sqlite";
 
 import { CONTRATOS, EMPLEADOS_DEMO } from "../config.ts";
+import { MODALIDADES } from "../calculos.ts";
+import type { Modalidad } from "../calculos.ts";
 import { consultar, ejecutar, filaACamel, uno } from "../db.ts";
 import type { Fila } from "../db.ts";
 import { parametrosDelAnio } from "../parametros.ts";
@@ -19,6 +21,11 @@ interface DatosEmpleado {
   regimen: string;
   categoriaLoep: string | null;
   escalaId: number | null;
+  /** null = lo que diga el régimen */
+  pagoDecimoTercero: Modalidad | null;
+  pagoDecimoCuarto: Modalidad | null;
+  pagoFondosReserva: Modalidad | null;
+  recibeHorasExtras: boolean | null;
 }
 
 /** Reglas de negocio del formulario. Devuelve los datos limpios y los avisos no bloqueantes. */
@@ -70,6 +77,25 @@ function validar(
     } else escalaId = grado.id;
   }
 
+  // Opciones de pago: vacío = lo que diga el régimen.
+  const modalidad = (campo: string, etiqueta: string): Modalidad | null => {
+    const valor = cuerpo[campo];
+    if (valor === null || valor === undefined || valor === "") return null;
+    if (!MODALIDADES.includes(valor as Modalidad)) {
+      errores.push(`${etiqueta}: elige 'no', 'mensual' o 'acumulado'.`);
+      return null;
+    }
+    return valor as Modalidad;
+  };
+  const pagoDecimoTercero = modalidad("pagoDecimoTercero", "Décimo tercero");
+  const pagoDecimoCuarto = modalidad("pagoDecimoCuarto", "Décimo cuarto");
+  const pagoFondosReserva = modalidad("pagoFondosReserva", "Fondos de reserva");
+  const horas = cuerpo.recibeHorasExtras;
+  if (horas !== null && horas !== undefined && horas !== "" && typeof horas !== "boolean") {
+    errores.push("Horas extras: indica si las recibe o deja la opción del régimen.");
+  }
+  const recibeHorasExtras = typeof horas === "boolean" ? horas : null;
+
   let sueldoBase = 0;
   try {
     sueldoBase = aDecimal(cuerpo.sueldoBase).toNumber();
@@ -90,12 +116,19 @@ function validar(
 
   if (errores.length) throw new ErrorApi(400, errores);
   return {
-    datos: { cedula, nombres, cargo, sueldoBase, fechaIngreso, tipoContrato, regimen, categoriaLoep, escalaId },
+    datos: {
+      cedula, nombres, cargo, sueldoBase, fechaIngreso, tipoContrato, regimen, categoriaLoep, escalaId,
+      pagoDecimoTercero, pagoDecimoCuarto, pagoFondosReserva, recibeHorasExtras,
+    },
     avisos,
   };
 }
 
-const aApi = (fila: Fila) => ({ ...filaACamel(fila), activo: fila.activo === 1 });
+const aApi = (fila: Fila) => ({
+  ...filaACamel(fila),
+  activo: fila.activo === 1,
+  recibeHorasExtras: fila.recibe_horas_extras === null ? null : fila.recibe_horas_extras === 1,
+});
 
 export function rutasEmpleados(db: DatabaseSync): Router {
   const router = Router();
@@ -150,9 +183,12 @@ export function rutasEmpleados(db: DatabaseSync): Router {
       const r = ejecutar(
         db,
         `INSERT INTO empleados (cedula, nombres, cargo, sueldo_base, fecha_ingreso, tipo_contrato,
-         regimen, categoria_loep, escala_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+         regimen, categoria_loep, escala_id, pago_decimo_tercero, pago_decimo_cuarto,
+         pago_fondos_reserva, recibe_horas_extras) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         datos.cedula, datos.nombres, datos.cargo, datos.sueldoBase, datos.fechaIngreso,
         datos.tipoContrato, datos.regimen, datos.categoriaLoep, datos.escalaId,
+        datos.pagoDecimoTercero, datos.pagoDecimoCuarto, datos.pagoFondosReserva,
+        datos.recibeHorasExtras === null ? null : Number(datos.recibeHorasExtras),
       );
       id = Number(r.lastInsertRowid);
     });
@@ -166,10 +202,13 @@ export function rutasEmpleados(db: DatabaseSync): Router {
       ejecutar(
         db,
         `UPDATE empleados SET cedula = ?, nombres = ?, cargo = ?, sueldo_base = ?,
-         fecha_ingreso = ?, tipo_contrato = ?, regimen = ?, categoria_loep = ?, escala_id = ?
+         fecha_ingreso = ?, tipo_contrato = ?, regimen = ?, categoria_loep = ?, escala_id = ?,
+         pago_decimo_tercero = ?, pago_decimo_cuarto = ?, pago_fondos_reserva = ?, recibe_horas_extras = ?
          WHERE id = ?`,
         datos.cedula, datos.nombres, datos.cargo, datos.sueldoBase, datos.fechaIngreso,
-        datos.tipoContrato, datos.regimen, datos.categoriaLoep, datos.escalaId, actual.id,
+        datos.tipoContrato, datos.regimen, datos.categoriaLoep, datos.escalaId,
+        datos.pagoDecimoTercero, datos.pagoDecimoCuarto, datos.pagoFondosReserva,
+        datos.recibeHorasExtras === null ? null : Number(datos.recibeHorasExtras), actual.id,
       );
     });
     res.json({ ...aApi(buscar(req.params.id)), avisos });

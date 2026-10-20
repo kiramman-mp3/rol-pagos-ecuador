@@ -1,13 +1,14 @@
 import { Router } from "express";
 import type { DatabaseSync } from "node:sqlite";
 
-import { calcularRol } from "../calculos.ts";
+import { calcularRol, MODALIDADES } from "../calculos.ts";
+import type { Modalidad } from "../calculos.ts";
 import { CONTRATOS, EMPRESA, MESES } from "../config.ts";
 import {
   aniosConParametros, guardarParametros, parametrosDelAnio, validarTablaIr,
 } from "../parametros.ts";
 import {
-  buscarRegimen, CATEGORIAS_LOEP, indexarRegimenes, listarRegimenes, regimenAplicado, reglasDe,
+  buscarRegimen, CATEGORIAS_LOEP, indexarRegimenes, listarRegimenes, opcionesDe, regimenAplicado, reglasDe,
 } from "../regimenes.ts";
 import { aDecimal, ErrorApi } from "../validaciones.ts";
 
@@ -84,13 +85,20 @@ export function rutasParametros(db: DatabaseSync): Router {
     const aplicado = regimenAplicado(
       regimenes, String(cuerpo.regimen ?? "CODIGO_TRABAJO"), cuerpo.categoriaLoep ? String(cuerpo.categoriaLoep) : null,
     );
+    // `decimos` fija la modalidad de los tres beneficios; sin él, la del régimen (mensual).
+    const decimos = cuerpo.decimos === undefined ? null : String(cuerpo.decimos);
+    if (decimos !== null && !MODALIDADES.includes(decimos as Modalidad)) {
+      errores.push("Décimos y fondos de reserva: elige 'no', 'mensual' o 'acumulado'.");
+    }
     if (errores.length) throw new ErrorApi(400, errores);
 
     res.json({
       ...calcularRol({
         sueldoBase, horasSuplementarias, horasExtraordinarias, comisiones,
         fechaIngreso: "2020-01-01", anio: 2026, mes: 10,
-      }, reglasDe(parametrosDelAnio(db, 2026).parametros, aplicado)),
+      }, reglasDe(parametrosDelAnio(db, 2026).parametros, aplicado), opcionesDe(aplicado, {
+        pago_decimo_tercero: decimos, pago_decimo_cuarto: decimos, pago_fondos_reserva: decimos,
+      })),
       regimenAplicado: aplicado.nombre,
       tasaIessPersonal: aplicado.iessPersonal,
       tasaIessPatronal: aplicado.iessPatronal,

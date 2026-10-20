@@ -94,6 +94,35 @@ import type { DatosEmpleado, Empleado, Grado } from '../../core/modelos';
             <input class="entrada" id="fechaIngreso" type="date" formControlName="fechaIngreso" />
             <span class="ayuda">Si ingresa a mitad de mes, el primer rol paga solo los días trabajados.</span>
           </div>
+          <fieldset class="campo c6 beneficios">
+            <legend>Beneficios de este empleado</legend>
+            <p class="ayuda">
+              Si no cambias nada, se aplica lo que diga el régimen: los décimos y los fondos de reserva se pagan
+              cada mes en el rol, y las horas extras se pagan. Cámbialo si el trabajador pidió acumularlos o no
+              los recibe.
+            </p>
+            <div class="rejilla-beneficios">
+              @for (b of beneficios; track b.control) {
+                <div class="campo">
+                  <label [for]="b.control">{{ b.etiqueta }}</label>
+                  <select class="entrada" [id]="b.control" [formControlName]="b.control">
+                    <option value="">Según el régimen</option>
+                    <option value="mensual">Se paga cada mes en el rol</option>
+                    <option value="acumulado">Lo acumula (el empleador lo provisiona)</option>
+                    <option value="no">No lo recibe</option>
+                  </select>
+                </div>
+              }
+              <div class="campo">
+                <label for="recibeHorasExtras">Horas extras</label>
+                <select class="entrada" id="recibeHorasExtras" formControlName="recibeHorasExtras">
+                  <option value="">Según el régimen</option>
+                  <option value="si">Las recibe</option>
+                  <option value="no">No las recibe</option>
+                </select>
+              </div>
+            </div>
+          </fieldset>
           <div class="acciones">
             <button class="boton" [disabled]="guardando()">Guardar empleado</button>
             <a class="boton boton-claro" routerLink="/sistema/empleados">Cancelar</a>
@@ -120,9 +149,19 @@ export class FormularioEmpleado {
     regimen: ['CODIGO_TRABAJO', Validators.required],
     categoriaLoep: [''],
     escalaId: [''],
+    pagoDecimoTercero: [''],
+    pagoDecimoCuarto: [''],
+    pagoFondosReserva: [''],
+    recibeHorasExtras: [''],
     sueldoBase: [null as number | null, [Validators.required, Validators.min(0.01)]],
     fechaIngreso: ['', Validators.required],
   });
+
+  protected readonly beneficios = [
+    { control: 'pagoDecimoTercero', etiqueta: 'Décimo tercero' },
+    { control: 'pagoDecimoCuarto', etiqueta: 'Décimo cuarto' },
+    { control: 'pagoFondosReserva', etiqueta: 'Fondos de reserva' },
+  ] as const;
 
   private readonly regimenSeleccionado = toSignal(this.form.controls.regimen.valueChanges, {
     initialValue: this.form.controls.regimen.value,
@@ -157,7 +196,15 @@ export class FormularioEmpleado {
     effect(() => {
       const e = this.actual();
       if (e) {
-        this.form.patchValue({ ...e, categoriaLoep: e.categoriaLoep ?? '', escalaId: e.escalaId ? String(e.escalaId) : '' });
+        this.form.patchValue({
+          ...e,
+          categoriaLoep: e.categoriaLoep ?? '',
+          escalaId: e.escalaId ? String(e.escalaId) : '',
+          pagoDecimoTercero: e.pagoDecimoTercero ?? '',
+          pagoDecimoCuarto: e.pagoDecimoCuarto ?? '',
+          pagoFondosReserva: e.pagoFondosReserva ?? '',
+          recibeHorasExtras: e.recibeHorasExtras === null ? '' : e.recibeHorasExtras ? 'si' : 'no',
+        });
       }
     });
 
@@ -185,7 +232,10 @@ export class FormularioEmpleado {
       this.avisos.error('Completa todos los campos antes de guardar.');
       return;
     }
-    const { categoriaLoep, escalaId, ...resto } = this.form.getRawValue();
+    const {
+      categoriaLoep, escalaId, pagoDecimoTercero, pagoDecimoCuarto, pagoFondosReserva, recibeHorasExtras,
+      ...resto
+    } = this.form.getRawValue();
     if (this.esMixto() && !categoriaLoep) {
       this.avisos.error('Elige si el empleado es servidor u obrero.');
       return;
@@ -194,6 +244,10 @@ export class FormularioEmpleado {
       ...resto,
       categoriaLoep: this.esMixto() ? categoriaLoep : null,
       escalaId: escalaId ? Number(escalaId) : null,
+      pagoDecimoTercero: pagoDecimoTercero || null,
+      pagoDecimoCuarto: pagoDecimoCuarto || null,
+      pagoFondosReserva: pagoFondosReserva || null,
+      recibeHorasExtras: recibeHorasExtras === '' ? null : recibeHorasExtras === 'si',
     } as DatosEmpleado;
     this.guardando.set(true);
     try {

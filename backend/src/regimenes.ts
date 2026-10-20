@@ -1,8 +1,8 @@
 /** Regímenes laborales guardados en la base y las reglas que de ellos salen. */
 import type { DatabaseSync } from "node:sqlite";
 
-import { REGLAS_CT_2026 } from "./calculos.ts";
-import type { ReglasRol } from "./calculos.ts";
+import { MODALIDADES, REGLAS_CT_2026 } from "./calculos.ts";
+import type { Modalidad, OpcionesRol, ReglasRol } from "./calculos.ts";
 import { consultar, ejecutar, uno } from "./db.ts";
 import type { Fila } from "./db.ts";
 import type { ParametrosAnio } from "./parametros.ts";
@@ -120,6 +120,28 @@ export function reglasDe(parametros: ParametrosAnio, regimen: Regimen): ReglasRo
     recargoNocturno: dato(regimen.recargoNocturno, "recargo nocturno"),
     topeSuplementariasMes: regimen.topeSuplementariasMes,
     topeExtraordinariasMes: regimen.topeExtraordinariasMes,
+  };
+}
+
+/**
+ * Cómo recibe cada beneficio un empleado. Lo que el empleado tiene escrito manda; si lo dejó
+ * vacío, vale el régimen: si lo concede se paga cada mes en el rol (lo que manda la ley por
+ * defecto) y si no lo concede, no se recibe.
+ */
+export function opcionesDe(
+  aplicado: Regimen,
+  empleado: { pago_decimo_tercero?: unknown; pago_decimo_cuarto?: unknown; pago_fondos_reserva?: unknown; recibe_horas_extras?: unknown },
+): OpcionesRol {
+  const elegida = (valor: unknown, concede: boolean): Modalidad =>
+    MODALIDADES.includes(valor as Modalidad) ? (valor as Modalidad) : concede ? "mensual" : "no";
+  return {
+    decimoTercero: elegida(empleado.pago_decimo_tercero, aplicado.aplicaDecimoTercero),
+    decimoCuarto: elegida(empleado.pago_decimo_cuarto, aplicado.aplicaDecimoCuarto),
+    fondosReserva: elegida(empleado.pago_fondos_reserva, aplicado.aplicaFondosReserva),
+    recibeHorasExtras:
+      empleado.recibe_horas_extras === null || empleado.recibe_horas_extras === undefined
+        ? aplicado.aplicaHorasExtras
+        : empleado.recibe_horas_extras === 1,
   };
 }
 

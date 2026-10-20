@@ -8,7 +8,7 @@ import { Api, ParametrosLey, valorSeguro } from '../../core/api';
 import { Avisos } from '../../core/avisos';
 import { DineroPipe, sumar } from '../../core/dinero.pipe';
 import { etiquetaRegimen } from '../../core/regimen';
-import type { RolCompleto, RolDetalle } from '../../core/modelos';
+import type { Modalidad, RolCompleto, RolDetalle } from '../../core/modelos';
 
 @Component({
   selector: 'app-detalle-rol',
@@ -76,7 +76,7 @@ import type { RolCompleto, RolDetalle } from '../../core/modelos';
             <thead>
               <tr>
                 <th rowspan="2">Empleado</th>
-                <th colspan="4" class="g-ingresos t-ingresos corte">Ingresos</th>
+                <th colspan="5" class="g-ingresos t-ingresos corte">Ingresos</th>
                 <th colspan="4" class="g-descuentos t-descuentos corte">Descuentos</th>
                 <th rowspan="2" class="num g-neto c-neto corte">Neto a recibir</th>
               </tr>
@@ -84,6 +84,7 @@ import type { RolCompleto, RolDetalle } from '../../core/modelos';
                 <th class="num corte">Sueldo</th>
                 <th class="num">Horas extra</th>
                 <th class="num">Comisiones</th>
+                <th class="num" title="Décimos y fondos de reserva que se pagan dentro del rol">Décimos y fondos</th>
                 <th class="num">Total</th>
                 <th class="num corte">Aporte IESS</th>
                 <th class="num">Impuesto a la renta</th>
@@ -104,6 +105,7 @@ import type { RolCompleto, RolDetalle } from '../../core/modelos';
                   <td class="num corte">{{ d.sueldo | dinero }}</td>
                   <td class="num">{{ horasExtra(d) | dinero }}</td>
                   <td class="num">{{ d.comisiones | dinero }}</td>
+                  <td class="num">{{ d.beneficiosMensuales | dinero }}</td>
                   <td class="num"><strong>{{ d.totalIngresos | dinero }}</strong></td>
                   <td class="num corte">
                     {{ d.aporteIess | dinero }}
@@ -122,6 +124,7 @@ import type { RolCompleto, RolDetalle } from '../../core/modelos';
                 <td class="num corte">{{ totales().sueldo | dinero }}</td>
                 <td class="num">{{ totales().horasExtra | dinero }}</td>
                 <td class="num">{{ totales().comisiones | dinero }}</td>
+                <td class="num">{{ totales().beneficios | dinero }}</td>
                 <td class="num">{{ r.totalIngresos | dinero }}</td>
                 <td class="num corte">{{ totales().iess | dinero }}</td>
                 <td class="num">{{ totales().impuesto | dinero }}</td>
@@ -137,7 +140,10 @@ import type { RolCompleto, RolDetalle } from '../../core/modelos';
       <section class="hoja hoja-provision" aria-labelledby="titulo-provisiones">
         <div class="hoja-titulo">
           <h2 id="titulo-provisiones">Costo empleador y provisiones</h2>
-          <p>Lo paga la empresa aparte del neto. No se descuenta al trabajador.</p>
+          <p>
+            Lo paga la empresa aparte del neto. Los décimos y fondos que se pagan en el rol ya están en los
+            ingresos; aquí solo aparecen los que el trabajador acumula.
+          </p>
         </div>
         <div class="deslizable">
           <table class="tabla planilla">
@@ -157,14 +163,24 @@ import type { RolCompleto, RolDetalle } from '../../core/modelos';
               @for (d of r.detalle; track d.id) {
                 <tr>
                   <td>{{ d.nombres }}</td>
-                  <td class="num">{{ d.decimoTercero | dinero }}</td>
-                  <td class="num">{{ d.decimoCuarto | dinero }}</td>
+                  <td class="num">
+                    @if (d.decimoTerceroModalidad === 'acumulado') { {{ d.decimoTercero | dinero }} }
+                    @else { <span class="apoyo">{{ pagado(d.decimoTerceroModalidad) }}</span> }
+                  </td>
+                  <td class="num">
+                    @if (d.decimoCuartoModalidad === 'acumulado') { {{ d.decimoCuarto | dinero }} }
+                    @else { <span class="apoyo">{{ pagado(d.decimoCuartoModalidad) }}</span> }
+                  </td>
                   <td class="num">{{ d.vacaciones | dinero }}</td>
                   <td class="num">
-                    @if (d.fondosReserva) {
+                    @if (d.fondosReservaModalidad === 'no') {
+                      <span class="apoyo">No recibe</span>
+                    } @else if (!d.fondosReserva) {
+                      <span class="apoyo" title="Se generan desde el mes 13 de trabajo">Aún no aplica</span>
+                    } @else if (d.fondosReservaModalidad === 'acumulado') {
                       {{ d.fondosReserva | dinero }}
                     } @else {
-                      <span class="apoyo" title="Se generan desde el mes 13 de trabajo">Aún no aplica</span>
+                      <span class="apoyo">{{ pagado(d.fondosReservaModalidad) }}</span>
                     }
                   </td>
                   <td class="num">
@@ -192,8 +208,8 @@ import type { RolCompleto, RolDetalle } from '../../core/modelos';
         </div>
         <div class="hoja-cuerpo pequeno apoyo">
           El décimo cuarto se calcula sobre el sueldo básico unificado ({{ parametros()?.sbu | dinero }}), el tercero
-          sobre el total de ingresos, las vacaciones sobre el ingreso con horas extras (1/24) y los fondos de reserva (8.33%) desde el
-          mes 13. El costo del empleador es el total de ingresos más estas provisiones.
+          sobre los ingresos aportables, las vacaciones sobre esos mismos ingresos según los días del régimen y los
+          fondos de reserva desde el mes 13. El costo del empleador es el total de ingresos más estas provisiones.
         </div>
       </section>
     } @else if (rol.error()) {
@@ -230,13 +246,20 @@ export class DetalleRol {
       iess: suma((x) => x.aporteIess),
       impuesto: suma((x) => x.impuestoRenta),
       otros: suma((x) => x.otrosDescuentos),
-      decimoTercero: suma((x) => x.decimoTercero),
-      decimoCuarto: suma((x) => x.decimoCuarto),
+      beneficios: suma((x) => x.beneficiosMensuales),
+      // En la tabla de provisiones solo cuenta lo que se acumula.
+      decimoTercero: suma((x) => (x.decimoTerceroModalidad === 'acumulado' ? x.decimoTercero : 0)),
+      decimoCuarto: suma((x) => (x.decimoCuartoModalidad === 'acumulado' ? x.decimoCuarto : 0)),
       vacaciones: suma((x) => x.vacaciones),
-      fondos: suma((x) => x.fondosReserva),
+      fondos: suma((x) => (x.fondosReservaModalidad === 'acumulado' ? x.fondosReserva : 0)),
       patronal: suma((x) => x.aportePatronal),
     };
   });
+
+  /** Qué decir en la tabla de provisiones cuando un beneficio no se provisiona. */
+  protected pagado(modalidad: Modalidad): string {
+    return modalidad === 'mensual' ? 'Pagado en el rol' : 'No recibe';
+  }
 
   protected regimen(d: RolDetalle): string {
     return etiquetaRegimen(this.parametros()?.regimenes, d.regimen, d.regimenAplicado);

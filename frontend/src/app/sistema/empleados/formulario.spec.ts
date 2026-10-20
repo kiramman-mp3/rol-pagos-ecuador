@@ -185,4 +185,30 @@ describe('FormularioEmpleado', () => {
     expect(el.querySelector('#escalaId option[value="13"]')).not.toBeNull(); // escala del Código
     expect(el.querySelector('#escalaId option[value="11"]')).toBeNull();
   });
+
+  it('por defecto deja los beneficios según el régimen y envía nulos', async () => {
+    const { el } = await abrir();
+    llenarBase(el);
+    el.querySelector('form')!.dispatchEvent(new Event('submit'));
+    const cuerpo = http.expectOne('/api/empleados').request.body;
+    expect(cuerpo.pagoDecimoTercero).toBeNull();
+    expect(cuerpo.pagoDecimoCuarto).toBeNull();
+    expect(cuerpo.pagoFondosReserva).toBeNull();
+    expect(cuerpo.recibeHorasExtras).toBeNull();
+  });
+
+  it('envía la modalidad de cada beneficio y si recibe horas extras', async () => {
+    const { el } = await abrir();
+    llenarBase(el);
+    escribir(el, 'pagoDecimoTercero', 'acumulado', 'change');
+    escribir(el, 'pagoDecimoCuarto', 'no', 'change');
+    escribir(el, 'pagoFondosReserva', 'mensual', 'change');
+    escribir(el, 'recibeHorasExtras', 'no', 'change');
+    el.querySelector('form')!.dispatchEvent(new Event('submit'));
+    const cuerpo = http.expectOne('/api/empleados').request.body;
+    expect(cuerpo.pagoDecimoTercero).toBe('acumulado');
+    expect(cuerpo.pagoDecimoCuarto).toBe('no');
+    expect(cuerpo.pagoFondosReserva).toBe('mensual');
+    expect(cuerpo.recibeHorasExtras).toBe(false);
+  });
 });

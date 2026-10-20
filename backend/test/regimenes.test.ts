@@ -69,7 +69,7 @@ describe("API de regímenes", () => {
       assert.equal(r.json.iessPersonal, 0.1);
       const { id } = (await generar(api)).json;
       const maria = await detalleDe(api, id, 1); // $4500 -> 10%
-      assert.equal(maria.aporteIess, 450);
+      assert.equal(maria.aporteIess, 450); // 10% de 4500, sin contar los beneficios pagados en el rol
       assert.equal(maria.tasaIessPersonal, 0.1);
     }));
 
@@ -252,7 +252,7 @@ describe("simulación según el régimen", () => {
   it("calcula con las reglas del régimen elegido", async () => {
     const api = await iniciar();
     try {
-      const ct = (await api.post("/api/simulacion", { sueldo: 2000 })).json;
+      const ct = (await api.post("/api/simulacion", { sueldo: 2000, decimos: "acumulado" })).json;
       assert.equal(ct.aporteIess, 189);
       assert.equal(ct.regimenAplicado, "Código del Trabajo");
       const losep = (await api.post("/api/simulacion", { sueldo: 2000, regimen: "LOSEP" })).json;

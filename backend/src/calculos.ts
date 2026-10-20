@@ -152,6 +152,32 @@ export function diasTrabajados(fechaIngreso: string, anio: number, mes: number):
   return 30;
 }
 
+/**
+ * Cómo recibe un empleado un beneficio:
+ *  - no:        no lo recibe.
+ *  - mensual:   se paga cada mes dentro del rol (lo que la ley manda por defecto).
+ *  - acumulado: el trabajador pidió acumularlo; el empleador lo provisiona.
+ */
+export type Modalidad = "no" | "mensual" | "acumulado";
+
+export const MODALIDADES: readonly Modalidad[] = ["no", "mensual", "acumulado"];
+
+export interface OpcionesRol {
+  decimoTercero: Modalidad;
+  decimoCuarto: Modalidad;
+  fondosReserva: Modalidad;
+  /** Si es falso, las horas suplementarias, extraordinarias y de descanso no se pagan. */
+  recibeHorasExtras: boolean;
+}
+
+/** Todo provisionado y con horas extras: el comportamiento del motor antes de las opciones. */
+export const OPCIONES_ACUMULADAS: OpcionesRol = {
+  decimoTercero: "acumulado",
+  decimoCuarto: "acumulado",
+  fondosReserva: "acumulado",
+  recibeHorasExtras: true,
+};
+
 export interface EntradaRol {
   sueldoBase: Monto;
   /** AAAA-MM-DD */
@@ -183,6 +209,10 @@ export interface ResultadoRol {
   valorHorasDescanso: number;
   valorRecargoNocturno: number;
   comisiones: number;
+  /** Lo que sirve de base para el IESS, el IR, el décimo tercero y las vacaciones. */
+  ingresosAportables: number;
+  /** Décimos y fondos de reserva que se pagan dentro del rol; no son aportables ni gravados. */
+  beneficiosMensuales: number;
   totalIngresos: number;
   // descuentos
   aporteIess: number;
@@ -193,23 +223,33 @@ export interface ResultadoRol {
   totalDescuentos: number;
   // neto
   netoPagar: number;
-  // provisiones y costo empleador (no afectan el neto)
+  // beneficios: su valor del mes y cómo se pagan
   decimoTercero: number;
+  decimoTerceroModalidad: Modalidad;
   decimoCuarto: number;
-  vacaciones: number;
+  decimoCuartoModalidad: Modalidad;
   fondosReserva: number;
+  fondosReservaModalidad: Modalidad;
+  // provisiones y costo empleador (no afectan el neto)
+  vacaciones: number;
   aportePatronal: number;
   totalProvisiones: number;
   costoEmpleador: number;
 }
 
-export function calcularRol(entrada: EntradaRol, reglas: ReglasRol = REGLAS_CT_2026): ResultadoRol {
+export function calcularRol(
+  entrada: EntradaRol,
+  reglas: ReglasRol = REGLAS_CT_2026,
+  opciones: OpcionesRol = OPCIONES_ACUMULADAS,
+): ResultadoRol {
   const sbu = D(reglas.sbu);
   const horasMes = D(reglas.horasMes);
   const sueldoBase = D(entrada.sueldoBase);
-  const horasSuplementarias = D(entrada.horasSuplementarias ?? 0);
-  const horasExtraordinarias = D(entrada.horasExtraordinarias ?? 0);
-  const horasDescanso = D(entrada.horasDescanso ?? 0);
+  // Quien no recibe horas extras no cobra suplementarias, extraordinarias ni de descanso.
+  const extra = (horas?: Monto) => (opciones.recibeHorasExtras ? D(horas ?? 0) : D(0));
+  const horasSuplementarias = extra(entrada.horasSuplementarias);
+  const horasExtraordinarias = extra(entrada.horasExtraordinarias);
+  const horasDescanso = extra(entrada.horasDescanso);
   const horasNocturnas = D(entrada.horasNocturnas ?? 0);
   const comisiones = q(entrada.comisiones ?? 0);
   const otrosDescuentos = q(entrada.otrosDescuentos ?? 0);
@@ -227,25 +267,45 @@ export function calcularRol(entrada: EntradaRol, reglas: ReglasRol = REGLAS_CT_2
   const vExtraordinarias = porHora(horasExtraordinarias, D(1).plus(reglas.recargoExtraordinarias));
   const vDescanso = porHora(horasDescanso, D(1).plus(reglas.recargoDescanso));
   const vNoc = porHora(horasNocturnas, D(reglas.recargoNocturno));
-  const totalIngresos = sueldo
+  const aportables = sueldo
     .plus(vSuplementarias).plus(vExtraordinarias).plus(vDescanso).plus(vNoc)
     .plus(comisiones);
 
-  // Descuentos. Todo el ingreso aquí es gravado con IESS.
-  const iess = q(totalIngresos.times(reglas.iessPersonal));
-  const ir = retencionIrMensual(totalIngresos, iess, reglas.tablaIr);
+  // Beneficios. Su valor sale siempre de los ingresos aportables del mes; lo que cambia es
+  // si se pagan en el rol (mensual), se provisionan (acumulado) o no existen (no).
+  // Los décimos y los fondos pagados en el rol no pagan IESS ni impuesto a la renta
+  // (Código del Trabajo arts. 112 y 114).
+  const cero = D("0.00");
+  const valorDe = (modalidad: Modalidad, valor: Decimal) => (modalidad === "no" ? cero : valor);
+  const decimoTercero = valorDe(opciones.decimoTercero, q(aportables.div(12)));
+  const decimoCuarto = valorDe(opciones.decimoCuarto, q(sbu.times(dias).div(12 * 30))); // sobre el SBU
+  const fondos = valorDe(
+    opciones.fondosReserva,
+    meses >= reglas.mesesParaFondos ? q(aportables.times(reglas.fondosReserva)) : cero,
+  );
+  const beneficios: [Modalidad, Decimal][] = [
+    [opciones.decimoTercero, decimoTercero],
+    [opciones.decimoCuarto, decimoCuarto],
+    [opciones.fondosReserva, fondos],
+  ];
+  const sumarSi = (modalidad: Modalidad) =>
+    beneficios.reduce((suma, [m, valor]) => (m === modalidad ? suma.plus(valor) : suma), cero);
+  const beneficiosMensuales = sumarSi("mensual");
+  const beneficiosAcumulados = sumarSi("acumulado");
+  const totalIngresos = aportables.plus(beneficiosMensuales);
+
+  // Descuentos. El IESS y el IR se calculan solo sobre lo aportable.
+  const iess = q(aportables.times(reglas.iessPersonal));
+  const ir = retencionIrMensual(aportables, iess, reglas.tablaIr);
   const totalDescuentos = iess.plus(ir.irMensual).plus(otrosDescuentos);
   const neto = totalIngresos.minus(totalDescuentos);
 
   // Provisiones del empleador: se muestran, no se descuentan.
-  const decimoTercero = q(totalIngresos.div(12));
-  const decimoCuarto = q(sbu.times(dias).div(12 * 30)); // sobre el SBU, no el sueldo
   // Código del Trabajo art. 71: la 24ava parte de lo percibido en el año, con horas extras y
   // retribuciones habituales. 15 días / 360 es esa misma fracción; con 30 días sería 1/12.
-  const vacaciones = q(totalIngresos.times(reglas.diasVacaciones).div(360));
-  const fondos = meses >= reglas.mesesParaFondos ? q(totalIngresos.times(reglas.fondosReserva)) : D("0.00");
-  const patronal = q(totalIngresos.times(reglas.iessPatronal));
-  const provisiones = decimoTercero.plus(decimoCuarto).plus(vacaciones).plus(fondos).plus(patronal);
+  const vacaciones = q(aportables.times(reglas.diasVacaciones).div(360));
+  const patronal = q(aportables.times(reglas.iessPatronal));
+  const provisiones = beneficiosAcumulados.plus(vacaciones).plus(patronal);
 
   return {
     diasTrabajados: dias,
@@ -261,6 +321,8 @@ export function calcularRol(entrada: EntradaRol, reglas: ReglasRol = REGLAS_CT_2
     valorHorasDescanso: vDescanso.toNumber(),
     valorRecargoNocturno: vNoc.toNumber(),
     comisiones: comisiones.toNumber(),
+    ingresosAportables: aportables.toNumber(),
+    beneficiosMensuales: beneficiosMensuales.toNumber(),
     totalIngresos: totalIngresos.toNumber(),
     aporteIess: iess.toNumber(),
     baseIrAnual: ir.baseAnual.toNumber(),
@@ -270,9 +332,12 @@ export function calcularRol(entrada: EntradaRol, reglas: ReglasRol = REGLAS_CT_2
     totalDescuentos: totalDescuentos.toNumber(),
     netoPagar: neto.toNumber(),
     decimoTercero: decimoTercero.toNumber(),
+    decimoTerceroModalidad: opciones.decimoTercero,
     decimoCuarto: decimoCuarto.toNumber(),
-    vacaciones: vacaciones.toNumber(),
+    decimoCuartoModalidad: opciones.decimoCuarto,
     fondosReserva: fondos.toNumber(),
+    fondosReservaModalidad: opciones.fondosReserva,
+    vacaciones: vacaciones.toNumber(),
     aportePatronal: patronal.toNumber(),
     totalProvisiones: provisiones.toNumber(),
     costoEmpleador: totalIngresos.plus(provisiones).toNumber(),
@@ -300,4 +365,13 @@ export function avisosDeTopes(nombre: string, horas: HorasDelMes, reglas: Reglas
   revisar("suplementarias", horas.horasSuplementarias, reglas.topeSuplementariasMes);
   revisar("extraordinarias", horas.horasExtraordinarias, reglas.topeExtraordinariasMes);
   return avisos;
+}
+
+/** Aviso (no bloquea) cuando se digitaron horas extras a quien no las recibe: no se pagan. */
+export function avisoHorasIgnoradas(
+  nombre: string,
+  horas: HorasDelMes & { horasDescanso: Monto },
+): string[] {
+  const total = D(horas.horasSuplementarias).plus(horas.horasExtraordinarias).plus(horas.horasDescanso);
+  return total.gt(0) ? [`${nombre}: no recibe horas extras; se ignoraron ${total.toString()} horas.`] : [];
 }
