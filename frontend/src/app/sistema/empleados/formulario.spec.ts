@@ -205,6 +205,38 @@ describe('FormularioEmpleado', () => {
     expect(el.querySelector<HTMLInputElement>('#sueldoBase')!.value).toBe('817');
   });
 
+  it('el cargo propuesto por un grado sigue al grado, pero uno escrito a mano no', async () => {
+    const { fixture, el } = await abrir();
+    escribir(el, 'regimen', 'LOSEP', 'change');
+    fixture.detectChanges();
+    escribir(el, 'escalaId', '11', 'change');
+    fixture.detectChanges();
+    expect(el.querySelector<HTMLInputElement>('#cargo')!.value).toBe('Servidor Público de Apoyo 3');
+
+    escribir(el, 'escalaId', '12', 'change'); // otro grado: el cargo propuesto se actualiza
+    fixture.detectChanges();
+    expect(el.querySelector<HTMLInputElement>('#cargo')!.value).toBe('Servidor Público 1');
+
+    escribir(el, 'cargo', 'Jefe de bodega'); // ahora lo escribe el usuario
+    escribir(el, 'escalaId', '11', 'change');
+    fixture.detectChanges();
+    expect(el.querySelector<HTMLInputElement>('#cargo')!.value).toBe('Jefe de bodega');
+  });
+
+  it('al cambiar de régimen, el cargo propuesto por el grado que se quita se limpia', async () => {
+    const { fixture, el } = await abrir();
+    escribir(el, 'regimen', 'LOSEP', 'change');
+    fixture.detectChanges();
+    escribir(el, 'escalaId', '11', 'change');
+    fixture.detectChanges();
+
+    escribir(el, 'regimen', 'CODIGO_TRABAJO', 'change');
+    fixture.detectChanges();
+    TestBed.tick();
+    fixture.detectChanges();
+    expect(el.querySelector<HTMLInputElement>('#cargo')!.value).toBe('');
+  });
+
   it('si cambia el régimen, el grado que ya no corresponde se quita', async () => {
     const { fixture, el } = await abrir();
     escribir(el, 'regimen', 'LOSEP', 'change');
