@@ -27,7 +27,9 @@ export class Landing {
   /** Espera a que termine de escribir para no consultar en cada tecla. */
   private readonly consulta = signal({
     sueldo: 1200, horasSuplementarias: 0, regimen: 'CODIGO_TRABAJO', categoriaLoep: 'servidor',
+    decimos: 'mensual',
   });
+  protected readonly decimos = signal('mensual');
   protected readonly regimen = signal('CODIGO_TRABAJO');
   protected readonly categoria = signal('servidor');
   protected readonly esMixto = computed(
@@ -47,6 +49,7 @@ export class Landing {
         horasSuplementarias: c.horasSuplementarias,
         regimen: c.regimen,
         categoriaLoep: c.regimen === 'LOEP' ? c.categoriaLoep : undefined,
+        decimos: c.decimos,
       },
     };
   });
@@ -59,10 +62,11 @@ export class Landing {
       const horasSuplementarias = Number(this.horas().replace(',', '.')) || 0;
       const regimen = this.regimen();
       const categoriaLoep = this.categoria();
+      const decimos = this.decimos();
       const temporizador = setTimeout(
         () =>
           this.consulta.set({
-            sueldo: Number.isFinite(sueldo) ? sueldo : 0, horasSuplementarias, regimen, categoriaLoep,
+            sueldo: Number.isFinite(sueldo) ? sueldo : 0, horasSuplementarias, regimen, categoriaLoep, decimos,
           }),
         250,
       );
@@ -70,8 +74,9 @@ export class Landing {
     });
   }
 
-  protected elegir(campo: 'regimen' | 'categoria', evento: Event) {
-    (campo === 'regimen' ? this.regimen : this.categoria).set((evento.target as HTMLSelectElement).value);
+  protected elegir(campo: 'regimen' | 'categoria' | 'decimos', evento: Event) {
+    const senal = { regimen: this.regimen, categoria: this.categoria, decimos: this.decimos }[campo];
+    senal.set((evento.target as HTMLSelectElement).value);
   }
 
   protected escribir(campo: 'sueldo' | 'horas', evento: Event) {

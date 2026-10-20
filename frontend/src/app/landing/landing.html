@@ -51,6 +51,14 @@
             </div>
           }
           <div class="campo">
+            <label for="sim-decimos">Décimos y fondos de reserva</label>
+            <select class="entrada" id="sim-decimos" (change)="elegir('decimos', $event)">
+              <option value="mensual" [selected]="decimos() === 'mensual'">Se pagan cada mes en el rol</option>
+              <option value="acumulado" [selected]="decimos() === 'acumulado'">El trabajador los acumula</option>
+              <option value="no" [selected]="decimos() === 'no'">No los recibe</option>
+            </select>
+          </div>
+          <div class="campo">
             <label for="sim-sueldo">Sueldo base (USD)</label>
             <input class="entrada num" id="sim-sueldo" type="number" min="1" step="0.01" inputmode="decimal"
                    [value]="sueldo()" (input)="escribir('sueldo', $event)" />
@@ -84,6 +92,7 @@
             </div>
             <dl class="desglose">
               <div><dt>Régimen aplicado</dt><dd>{{ r.regimenAplicado }}</dd></div>
+              <div><dt>Décimos y fondos pagados en el rol</dt><dd>{{ r.beneficiosMensuales | dinero }}</dd></div>
               <div>
                 <dt>Aporte personal al IESS ({{ r.tasaIessPersonal | percent: '1.2-2' }})</dt>
                 <dd>{{ r.aporteIess | dinero }}</dd>
