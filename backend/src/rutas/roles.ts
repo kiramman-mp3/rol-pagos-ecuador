@@ -8,6 +8,8 @@ import {
   aSnake, consultar, ejecutar, filaACamel, transaccion, uno,
 } from "../db.ts";
 import type { Fila } from "../db.ts";
+import { parametrosDelAnio } from "../parametros.ts";
+import { reglasDe } from "../reglas.ts";
 import { aDecimal, ErrorApi } from "../validaciones.ts";
 
 const CAMPOS_NOVEDAD = [
@@ -42,6 +44,7 @@ function guardarRol(
   empleados: Fila[], novedades: Map<number, Novedad>,
 ): number {
   const cero = new Decimal(0);
+  const reglas = reglasDe(parametrosDelAnio(db, anio).parametros);
   const calculos = empleados.map((e) => {
     const n = novedades.get(Number(e.id));
     const resultado = calcularRol({
@@ -53,7 +56,7 @@ function guardarRol(
       horasNocturnas: n?.horasNocturnas ?? cero,
       comisiones: n?.comisiones ?? cero,
       otrosDescuentos: n?.otrosDescuentos ?? cero,
-    });
+    }, reglas);
     return { e, resultado, n };
   });
 

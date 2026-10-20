@@ -6,6 +6,7 @@ import {
   diasTrabajados,
   impuestoRentaAnual,
   mesesDeServicio,
+  REGLAS_CT_2026,
 } from "../src/calculos.ts";
 
 const ANTIGUO = "2020-01-15";
@@ -92,6 +93,50 @@ describe("calcularRol", () => {
     const r = calcularRol({ sueldoBase: 1000, fechaIngreso: "2026-10-16", anio: 2026, mes: 10 });
     assert.equal(r.sueldo, 500);
     assert.equal(r.decimoCuarto, 20.08); // prorrateado también
+  });
+});
+
+describe("reglas inyectadas", () => {
+  const base = { sueldoBase: 2000, fechaIngreso: ANTIGUO, anio: 2026, mes: 10 };
+
+  it("sin reglas usa el Código del Trabajo 2026", () => {
+    assert.deepEqual(calcularRol(base), calcularRol(base, REGLAS_CT_2026));
+  });
+
+  it("el aporte al IESS sale de las reglas, no de una constante", () => {
+    const r = calcularRol(base, { ...REGLAS_CT_2026, iessPersonal: "0.1145", iessPatronal: "0.0915" });
+    assert.equal(r.aporteIess, 229); // 11.45% de 2000
+    assert.equal(r.aportePatronal, 183); // 9.15%
+  });
+
+  it("el SBU de las reglas define el décimo cuarto", () => {
+    const r = calcularRol(base, { ...REGLAS_CT_2026, sbu: 600 });
+    assert.equal(r.decimoCuarto, 50); // 600 / 12
+  });
+
+  it("los recargos de las reglas definen el valor de las horas", () => {
+    // valor hora = 960 / 240 = 4.00; suplementarias al 25% y descanso al 60%
+    const r = calcularRol(
+      { sueldoBase: 960, fechaIngreso: ANTIGUO, anio: 2026, mes: 10, horas50: 10, horas100: 5 },
+      { ...REGLAS_CT_2026, recargoSuplementarias: "0.25", recargoDescanso: "0.6" },
+    );
+    assert.equal(r.valorHoras50, 50); // 10 * 4 * 1.25
+    assert.equal(r.valorHoras100, 32); // 5 * 4 * 1.6
+  });
+
+  it("la tabla del IR de las reglas define el impuesto", () => {
+    const sinImpuesto = calcularRol(base, {
+      ...REGLAS_CT_2026,
+      tablaIr: [{ desde: 0, hasta: null, cuota: 0, porcentaje: 0 }],
+    });
+    assert.equal(sinImpuesto.impuestoRenta, 0);
+    assert.equal(sinImpuesto.netoPagar, 1811); // 2000 - 189 de IESS
+  });
+
+  it("los meses para generar fondos de reserva son configurables", () => {
+    const entrada = { ...base, fechaIngreso: "2026-04-01" }; // 6 meses de servicio
+    assert.equal(calcularRol(entrada).fondosReserva, 0);
+    assert.equal(calcularRol(entrada, { ...REGLAS_CT_2026, mesesParaFondos: 6 }).fondosReserva, 166.6);
   });
 });
 
