@@ -9,7 +9,7 @@ import {
 } from "../db.ts";
 import type { Fila } from "../db.ts";
 import { parametrosDelAnio } from "../parametros.ts";
-import { reglasDe } from "../reglas.ts";
+import { indexarRegimenes, listarRegimenes, regimenAplicado, reglasDe } from "../regimenes.ts";
 import { aDecimal, ErrorApi } from "../validaciones.ts";
 
 const CAMPOS_NOVEDAD = [
@@ -47,9 +47,11 @@ function guardarRol(
 ): { rolId: number; avisos: string[] } {
   const cero = new Decimal(0);
   const { parametros, exacto } = parametrosDelAnio(db, anio);
-  const reglas = reglasDe(parametros);
+  const regimenes = indexarRegimenes(listarRegimenes(db));
   const calculos = empleados.map((e) => {
     const n = novedades.get(Number(e.id));
+    const aplicado = regimenAplicado(regimenes, String(e.regimen), e.categoria_loep as string | null);
+    const reglas = reglasDe(parametros, aplicado);
     const resultado = calcularRol({
       sueldoBase: String(e.sueldo_base),
       fechaIngreso: String(e.fecha_ingreso),
@@ -61,10 +63,10 @@ function guardarRol(
       comisiones: n?.comisiones ?? cero,
       otrosDescuentos: n?.otrosDescuentos ?? cero,
     }, reglas);
-    return { e, resultado, n };
+    return { e, resultado, n, aplicado, reglas };
   });
 
-  const avisos = calculos.flatMap(({ e, n }) =>
+  const avisos = calculos.flatMap(({ e, n, reglas }) =>
     n ? avisosDeTopes(String(e.nombres), n, reglas) : [],
   );
   if (!exacto) avisos.unshift(`No hay parámetros de ${anio}; se usaron los de ${parametros.anio}.`);
@@ -86,10 +88,12 @@ function guardarRol(
       ).lastInsertRowid,
     );
 
-    for (const { e, resultado, n } of calculos) {
+    for (const { e, resultado, n, aplicado } of calculos) {
       const fila: Fila = {
         rol_id: nuevoId, empleado_id: Number(e.id), cedula: e.cedula, nombres: e.nombres,
         cargo: e.cargo, sueldo_base: e.sueldo_base, fecha_ingreso: e.fecha_ingreso,
+        regimen: e.regimen, regimen_aplicado: aplicado.codigo,
+        tasa_iess_personal: aplicado.iessPersonal, tasa_iess_patronal: aplicado.iessPatronal,
         ...Object.fromEntries(Object.entries(resultado).map(([k, v]) => [aSnake(k), v])),
       };
       const columnas = Object.keys(fila);
@@ -113,7 +117,7 @@ function guardarRol(
 }
 
 const COLUMNAS_CSV = [
-  "cedula", "nombres", "cargo", "sueldo", "valor_horas_suplementarias",
+  "cedula", "nombres", "cargo", "regimen_aplicado", "sueldo", "valor_horas_suplementarias",
   "valor_horas_extraordinarias", "valor_horas_descanso", "valor_recargo_nocturno", "comisiones", "total_ingresos", "aporte_iess", "impuesto_renta",
   "otros_descuentos", "total_descuentos", "neto_pagar", "decimo_tercero", "decimo_cuarto",
   "vacaciones", "fondos_reserva", "aporte_patronal", "costo_empleador",
@@ -148,6 +152,7 @@ export function rutasRoles(db: DatabaseSync): Router {
   /** Empleados que entrarán al rol del mes y las novedades que ya se habían digitado. */
   router.get("/periodo/:anio/:mes", (req, res) => {
     const { anio, mes } = leerPeriodo(req.params.anio, req.params.mes);
+    const regimenes = indexarRegimenes(listarRegimenes(db));
     const guardadas = new Map(
       consultar(db, "SELECT * FROM novedades WHERE anio = ? AND mes = ?", anio, mes)
         .map((n) => [Number(n.empleado_id), n]),
@@ -159,6 +164,8 @@ export function rutasRoles(db: DatabaseSync): Router {
         const g = guardadas.get(Number(e.id));
         return {
           id: e.id, nombres: e.nombres, cargo: e.cargo, sueldoBase: e.sueldo_base,
+          regimen: e.regimen,
+          regimenAplicado: regimenAplicado(regimenes, String(e.regimen), e.categoria_loep as string | null).codigo,
           novedades: {
             horasSuplementarias: g?.horas_suplementarias ?? 0,
             horasExtraordinarias: g?.horas_extraordinarias ?? 0,
