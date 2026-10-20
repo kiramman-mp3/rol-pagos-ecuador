@@ -1,28 +1,55 @@
 import { Router } from "express";
+import type { DatabaseSync } from "node:sqlite";
 
-import {
-  calcularRol, FONDOS_RESERVA, IESS_PATRONAL, IESS_PERSONAL, SBU, TABLA_IR_2026,
-} from "../calculos.ts";
+import { calcularRol, FONDOS_RESERVA, IESS_PATRONAL, IESS_PERSONAL } from "../calculos.ts";
 import { CONTRATOS, EMPRESA, MESES } from "../config.ts";
+import {
+  aniosConParametros, guardarParametros, parametrosDelAnio, validarTablaIr,
+} from "../parametros.ts";
 import { aDecimal, ErrorApi } from "../validaciones.ts";
 
-export function rutasParametros(): Router {
+export function rutasParametros(db: DatabaseSync): Router {
   const router = Router();
 
-  /** Reglas de ley vigentes: el frontend las muestra sin repetirlas. */
-  router.get("/parametros", (_req, res) => {
+  /** Reglas de ley de un año (por defecto el actual): el frontend las muestra sin repetirlas. */
+  router.get("/parametros", (req, res) => {
+    const pedido = Number(req.query.anio ?? new Date().getFullYear());
+    const { parametros, exacto } = parametrosDelAnio(db, Number.isInteger(pedido) ? pedido : new Date().getFullYear());
     res.json({
-      anio: 2026,
-      sbu: SBU.toNumber(),
+      anio: parametros.anio,
+      anioSolicitado: pedido,
+      exacto,
+      anios: aniosConParametros(db),
+      sbu: parametros.sbu,
+      fuente: parametros.fuente,
       iessPersonal: IESS_PERSONAL.toNumber(),
       iessPatronal: IESS_PATRONAL.toNumber(),
       fondosReserva: FONDOS_RESERVA.toNumber(),
-      fraccionExentaIr: TABLA_IR_2026[0].hasta,
-      tablaIr: TABLA_IR_2026,
+      fraccionExentaIr: parametros.tablaIr[0].hasta,
+      tablaIr: parametros.tablaIr,
       empresa: EMPRESA,
       meses: MESES,
       contratos: CONTRATOS,
     });
+  });
+
+  /** Crea o actualiza los parámetros de un año (SBU y tabla del IR). */
+  router.put("/parametros/:anio", (req, res) => {
+    const anio = Number(req.params.anio);
+    if (!Number.isInteger(anio) || anio < 2000 || anio > 2100) throw new ErrorApi(400, ["Año inválido."]);
+    const cuerpo = req.body ?? {};
+    const errores: string[] = [];
+    let sbu = 0;
+    try {
+      sbu = aDecimal(cuerpo.sbu, 0).toNumber();
+      if (sbu <= 0) errores.push("El SBU debe ser mayor a cero.");
+    } catch (error) {
+      errores.push(`SBU: ${(error as Error).message}.`);
+    }
+    if (errores.length) throw new ErrorApi(400, errores);
+    const tabla = validarTablaIr(cuerpo.tablaIr);
+    guardarParametros(db, anio, sbu, tabla, String(cuerpo.fuente ?? "").slice(0, 300));
+    res.json(parametrosDelAnio(db, anio).parametros);
   });
 
   /**
