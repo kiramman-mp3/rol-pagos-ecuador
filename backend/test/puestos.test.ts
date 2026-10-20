@@ -108,7 +108,7 @@ describe("empleados y orgánico", () => {
     conApi(async (api) => {
       const r = await api.post("/api/empleados", { ...EMPLEADO, puestoId: 1, escalaId: undefined, sueldoBase: 482 });
       assert.equal(r.status, 400);
-      assert.match(r.json.errores[0], /no puede ser menor al mínimo del nivel A: Jefatura \(\$510\)/);
+      assert.match(r.json.errores[0], /es menor al mínimo del nivel A: Jefatura \(\$510\)/);
     }));
 
   it("un puesto que no existe o de otra escala se rechaza", () =>

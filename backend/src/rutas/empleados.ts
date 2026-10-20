@@ -132,15 +132,17 @@ function validar(
     else {
       // El SBU del año en curso sale de la base, no de una constante.
       const { parametros } = parametrosDelAnio(db, new Date().getFullYear());
-      if (sueldoBase < parametros.sbu) {
-        avisos.push(`Aviso: el sueldo es menor al SBU ${parametros.anio} ($${parametros.sbu}).`);
+      if (grado && escalaId !== null && grado.esMinimo && sueldoBase < grado.rmu) {
+        errores.push(
+          `No se puede registrar al empleado: el sueldo ($${sueldoBase}) es menor al mínimo del nivel ${grado.denominacion} ($${grado.rmu}).`,
+        );
+      } else if (sueldoBase < parametros.sbu) {
+        errores.push(
+          `No se puede registrar al empleado: el sueldo ($${sueldoBase}) es menor al salario básico unificado ${parametros.anio} ($${parametros.sbu}).`,
+        );
       }
-      if (grado && escalaId !== null) {
-        if (grado.esMinimo && sueldoBase < grado.rmu) {
-          errores.push(`El sueldo ($${sueldoBase}) no puede ser menor al mínimo del nivel ${grado.denominacion} ($${grado.rmu}).`);
-        } else if (!grado.esMinimo && sueldoBase !== grado.rmu) {
-          errores.push(`El sueldo ($${sueldoBase}) debe ser la RMU del grado ${grado.grado} ($${grado.rmu}).`);
-        }
+      if (grado && escalaId !== null && !grado.esMinimo && sueldoBase !== grado.rmu) {
+        errores.push(`El sueldo ($${sueldoBase}) debe ser la RMU del grado ${grado.grado} ($${grado.rmu}).`);
       }
     }
   } catch (error) {
