@@ -1,5 +1,6 @@
 import { httpResource } from '@angular/common/http';
-import { Component, effect, inject, input, signal } from '@angular/core';
+import { Component, computed, effect, inject, input, signal } from '@angular/core';
+import { toSignal } from '@angular/core/rxjs-interop';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
 import { firstValueFrom } from 'rxjs';
@@ -43,6 +44,31 @@ import type { DatosEmpleado, Empleado } from '../../core/modelos';
             </select>
           </div>
           <div class="campo c3">
+            <label for="regimen">Régimen laboral</label>
+            <select class="entrada" id="regimen" formControlName="regimen">
+              @for (r of parametros()?.regimenes; track r.codigo) {
+                <option [value]="r.codigo">{{ r.nombre }}</option>
+              }
+            </select>
+            @if (regimenElegido(); as r) {
+              <span class="ayuda">
+                {{ r.descripcion }}
+                @if (!r.verificado) { <strong>Algunos valores de este régimen están por confirmar.</strong> }
+              </span>
+            }
+          </div>
+          @if (esMixto()) {
+            <div class="campo c3">
+              <label for="categoriaLoep">Categoría en la empresa pública</label>
+              <select class="entrada" id="categoriaLoep" formControlName="categoriaLoep">
+                <option value="">Elige una categoría</option>
+                <option value="servidor">Servidor público (se rige por la LOSEP)</option>
+                <option value="obrero">Obrero (se rige por el Código del Trabajo)</option>
+              </select>
+              <span class="ayuda">La categoría decide qué reglas se aplican en el rol.</span>
+            </div>
+          }
+          <div class="campo c3">
             <label for="sueldoBase">Sueldo base (USD)</label>
             <input class="entrada num" id="sueldoBase" type="number" step="0.01" min="0.01"
                    formControlName="sueldoBase" />
@@ -78,9 +104,19 @@ export class FormularioEmpleado {
     nombres: ['', Validators.required],
     cargo: ['', Validators.required],
     tipoContrato: ['Indefinido', Validators.required],
+    regimen: ['CODIGO_TRABAJO', Validators.required],
+    categoriaLoep: [''],
     sueldoBase: [null as number | null, [Validators.required, Validators.min(0.01)]],
     fechaIngreso: ['', Validators.required],
   });
+
+  private readonly regimenSeleccionado = toSignal(this.form.controls.regimen.valueChanges, {
+    initialValue: this.form.controls.regimen.value,
+  });
+  protected readonly regimenElegido = computed(() =>
+    this.parametros()?.regimenes.find((r) => r.codigo === this.regimenSeleccionado()),
+  );
+  protected readonly esMixto = computed(() => this.regimenElegido()?.tipo === 'mixto');
 
   private readonly actual = valorSeguro(
     httpResource<Empleado>(() => (this.id() ? `/api/empleados/${this.id()}` : undefined)),
@@ -90,7 +126,7 @@ export class FormularioEmpleado {
     // Al llegar el empleado a editar, se llenan los campos.
     effect(() => {
       const e = this.actual();
-      if (e) this.form.patchValue(e);
+      if (e) this.form.patchValue({ ...e, categoriaLoep: e.categoriaLoep ?? '' });
     });
   }
 
@@ -101,7 +137,12 @@ export class FormularioEmpleado {
       this.avisos.error('Completa todos los campos antes de guardar.');
       return;
     }
-    const datos = this.form.getRawValue() as DatosEmpleado;
+    const { categoriaLoep, ...resto } = this.form.getRawValue();
+    if (this.esMixto() && !categoriaLoep) {
+      this.avisos.error('Elige si el empleado es servidor u obrero.');
+      return;
+    }
+    const datos = { ...resto, categoriaLoep: this.esMixto() ? categoriaLoep : null } as DatosEmpleado;
     this.guardando.set(true);
     try {
       const id = this.id();

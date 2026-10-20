@@ -8,6 +8,10 @@ export interface Empleado {
   sueldoBase: number;
   fechaIngreso: string;
   tipoContrato: string;
+  /** Código del régimen: CODIGO_TRABAJO, LOSEP o LOEP */
+  regimen: string;
+  /** Solo para LOEP: 'servidor' u 'obrero' */
+  categoriaLoep: string | null;
   activo: boolean;
   /** Solo viene al crear o editar: avisos que no bloquean el guardado. */
   avisos?: string[];
@@ -22,6 +26,36 @@ export interface TramoIr {
   porcentaje: number;
 }
 
+/** Reglas de un régimen laboral. Los porcentajes son fracciones (0.0945 = 9.45%). */
+export interface Regimen {
+  codigo: string;
+  nombre: string;
+  descripcion: string;
+  baseLegal: string;
+  /** 'mixto' remite a otros regímenes según la categoría (la LOEP) */
+  tipo: 'reglas' | 'mixto';
+  regimenServidor: string | null;
+  regimenObrero: string | null;
+  iessPersonal: number | null;
+  iessPatronal: number | null;
+  recargoSuplementarias: number | null;
+  recargoExtraordinarias: number | null;
+  recargoDescanso: number | null;
+  recargoNocturno: number | null;
+  topeSuplementariasMes: number | null;
+  topeExtraordinariasMes: number | null;
+  diasVacaciones: number | null;
+  fondosReserva: number | null;
+  mesesParaFondos: number | null;
+  aplicaDecimoTercero: boolean;
+  aplicaDecimoCuarto: boolean;
+  aplicaFondosReserva: boolean;
+  aplicaHorasExtras: boolean;
+  /** false = hay algo por confirmar (ver notas) */
+  verificado: boolean;
+  notas: string;
+}
+
 export interface Parametros {
   anio: number;
   sbu: number;
@@ -33,6 +67,15 @@ export interface Parametros {
   empresa: { nombre: string; ruc: string };
   meses: string[];
   contratos: string[];
+  regimenes: Regimen[];
+  categoriasLoep: string[];
+}
+
+/** La simulación agrega el régimen con que se calculó. */
+export interface ResultadoSimulacion extends ResultadoRol {
+  regimenAplicado: string;
+  tasaIessPersonal: number;
+  tasaIessPatronal: number;
 }
 
 /** Cálculo de un rol; lo comparten la simulación y cada fila del detalle. */
@@ -75,6 +118,10 @@ export interface RolDetalle extends ResultadoRol {
   cargo: string;
   sueldoBase: number;
   fechaIngreso: string;
+  regimen: string;
+  regimenAplicado: string;
+  tasaIessPersonal: number;
+  tasaIessPatronal: number;
 }
 
 export interface RolCabecera {
@@ -108,6 +155,8 @@ export interface EmpleadoDelPeriodo {
   nombres: string;
   cargo: string;
   sueldoBase: number;
+  regimen: string;
+  regimenAplicado: string;
   novedades: Novedades;
 }
 
@@ -120,6 +169,8 @@ export interface Periodo {
 
 export interface EntradaSimulacion {
   sueldo: number;
+  regimen?: string;
+  categoriaLoep?: string;
   horasSuplementarias?: number;
   horasExtraordinarias?: number;
   comisiones?: number;
