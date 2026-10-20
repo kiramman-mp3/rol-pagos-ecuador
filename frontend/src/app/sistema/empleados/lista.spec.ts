@@ -8,7 +8,8 @@ import { ListaEmpleados } from './lista';
 
 const ANA: Empleado = {
   id: 1, cedula: '1801234566', nombres: 'Ana Prueba', cargo: 'Analista', sueldoBase: 1000,
-  fechaIngreso: '2024-01-10', tipoContrato: 'Indefinido', activo: true,
+  fechaIngreso: '2024-01-10', tipoContrato: 'Indefinido', regimen: 'CODIGO_TRABAJO', categoriaLoep: null,
+  activo: true,
 };
 
 describe('ListaEmpleados', () => {
@@ -25,6 +26,7 @@ describe('ListaEmpleados', () => {
     const fixture = TestBed.createComponent(ListaEmpleados);
     fixture.detectChanges();
     TestBed.tick(); // el recurso emite su petición al correr los efectos
+    http.expectOne('/api/parametros').flush({ regimenes: [{ codigo: 'CODIGO_TRABAJO', nombre: 'Código del Trabajo' }] });
     http.expectOne('/api/empleados').flush(empleados);
     await fixture.whenStable();
     fixture.detectChanges();
@@ -38,6 +40,7 @@ describe('ListaEmpleados', () => {
     expect(filas[0].textContent).toContain('Ana Prueba');
     expect(filas[0].textContent).toContain('$1,000.00');
     expect(filas[0].textContent).toContain('Activo');
+    expect(filas[0].textContent).toContain('Código del Trabajo');
     expect(filas[1].textContent).toContain('Inactivo');
   });
 
@@ -68,6 +71,7 @@ describe('ListaEmpleados', () => {
     const fixture = TestBed.createComponent(ListaEmpleados);
     fixture.detectChanges();
     TestBed.tick();
+    http.expectOne('/api/parametros').flush({ regimenes: [] });
     http.expectOne('/api/empleados').flush('error', { status: 500, statusText: 'Server Error' });
     await fixture.whenStable();
     fixture.detectChanges();
