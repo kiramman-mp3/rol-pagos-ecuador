@@ -34,6 +34,23 @@
       <div class="hoja-cuerpo">
         <div class="campos">
           <div class="campo">
+            <label for="sim-regimen">Régimen laboral</label>
+            <select class="entrada" id="sim-regimen" (change)="elegir('regimen', $event)">
+              @for (r of ley()?.regimenes; track r.codigo) {
+                <option [value]="r.codigo" [selected]="r.codigo === regimen()">{{ r.nombre }}</option>
+              }
+            </select>
+          </div>
+          @if (esMixto()) {
+            <div class="campo">
+              <label for="sim-categoria">Categoría</label>
+              <select class="entrada" id="sim-categoria" (change)="elegir('categoria', $event)">
+                <option value="servidor" [selected]="categoria() === 'servidor'">Servidor público</option>
+                <option value="obrero" [selected]="categoria() === 'obrero'">Obrero</option>
+              </select>
+            </div>
+          }
+          <div class="campo">
             <label for="sim-sueldo">Sueldo base (USD)</label>
             <input class="entrada num" id="sim-sueldo" type="number" min="1" step="0.01" inputmode="decimal"
                    [value]="sueldo()" (input)="escribir('sueldo', $event)" />
@@ -66,7 +83,11 @@
               </div>
             </div>
             <dl class="desglose">
-              <div><dt>Aporte personal al IESS</dt><dd>{{ r.aporteIess | dinero }}</dd></div>
+              <div><dt>Régimen aplicado</dt><dd>{{ r.regimenAplicado }}</dd></div>
+              <div>
+                <dt>Aporte personal al IESS ({{ r.tasaIessPersonal | percent: '1.2-2' }})</dt>
+                <dd>{{ r.aporteIess | dinero }}</dd>
+              </div>
               <div><dt>Impuesto a la renta del mes</dt><dd>{{ r.impuestoRenta | dinero }}</dd></div>
               <div class="provision">
                 <dt>Costo total para la empresa</dt><dd>{{ r.costoEmpleador | dinero }}</dd>
@@ -93,7 +114,7 @@
       </li>
       <li>
         <h3>Anota las novedades del mes</h3>
-        <p>Horas extras al 50% y al 100%, recargo nocturno, comisiones y anticipos. Lo que dejes en blanco cuenta como cero.</p>
+        <p>Horas suplementarias, extraordinarias y de fin de semana, recargo nocturno, comisiones y anticipos. Lo que dejes en blanco cuenta como cero.</p>
       </li>
       <li>
         <h3>Genera el rol</h3>
@@ -126,6 +147,35 @@
           </dl>
         </div>
       </div>
+
+      <details class="tabla-ir">
+        <summary>Ver las reglas de cada régimen laboral</summary>
+        <div class="deslizable">
+          <table class="tabla">
+            <thead>
+              <tr>
+                <th>Regla</th>
+                @for (r of reglasPropias(); track r.codigo) {
+                  <th class="num">{{ r.nombre }}</th>
+                }
+              </tr>
+            </thead>
+            <tbody>
+              <tr><td>Aporte personal al IESS</td>@for (r of reglasPropias(); track r.codigo) { <td class="num">{{ r.iessPersonal | percent: '1.2-2' }}</td> }</tr>
+              <tr><td>Aporte patronal al IESS</td>@for (r of reglasPropias(); track r.codigo) { <td class="num">{{ r.iessPatronal | percent: '1.2-2' }}</td> }</tr>
+              <tr><td>Horas suplementarias</td>@for (r of reglasPropias(); track r.codigo) { <td class="num">+{{ r.recargoSuplementarias | percent: '1.0-0' }}</td> }</tr>
+              <tr><td>Horas extraordinarias</td>@for (r of reglasPropias(); track r.codigo) { <td class="num">+{{ r.recargoExtraordinarias | percent: '1.0-0' }}</td> }</tr>
+              <tr><td>Sábado, domingo y feriado</td>@for (r of reglasPropias(); track r.codigo) { <td class="num">+{{ r.recargoDescanso | percent: '1.0-0' }}</td> }</tr>
+              <tr><td>Vacaciones al año</td>@for (r of reglasPropias(); track r.codigo) { <td class="num">{{ r.diasVacaciones }} días</td> }</tr>
+              <tr><td>Fondos de reserva</td>@for (r of reglasPropias(); track r.codigo) { <td class="num">{{ r.fondosReserva | percent: '1.2-2' }}</td> }</tr>
+            </tbody>
+          </table>
+        </div>
+        <p class="pequeno apoyo">
+          La LOEP (empresas públicas) no tiene tasas propias: sus servidores de carrera siguen la LOSEP y sus obreros el
+          Código del Trabajo. Los valores de la LOSEP marcados «por confirmar» están en la pantalla de parámetros.
+        </p>
+      </details>
 
       <details class="tabla-ir">
         <summary>Ver la tabla del impuesto a la renta {{ p.anio }}</summary>

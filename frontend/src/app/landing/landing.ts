@@ -5,7 +5,7 @@ import { RouterLink } from '@angular/router';
 
 import { ParametrosLey, valorSeguro } from '../core/api';
 import { DineroPipe } from '../core/dinero.pipe';
-import type { ResultadoRol } from '../core/modelos';
+import type { ResultadoSimulacion } from '../core/modelos';
 
 /** Página de inicio pública: explica el sistema y lleva a /sistema. */
 @Component({
@@ -17,19 +17,38 @@ import type { ResultadoRol } from '../core/modelos';
 export class Landing {
   protected readonly parametros = inject(ParametrosLey);
   protected readonly ley = this.parametros.valor;
+  protected readonly reglasPropias = computed(
+    () => this.ley()?.regimenes.filter((r) => r.tipo === 'reglas') ?? [],
+  );
 
   // --- Simulador: se calcula en el servidor, con el mismo motor del sistema ---
   protected readonly sueldo = signal('1200');
   protected readonly horas = signal('');
   /** Espera a que termine de escribir para no consultar en cada tecla. */
-  private readonly consulta = signal({ sueldo: 1200, horasSuplementarias: 0 });
+  private readonly consulta = signal({
+    sueldo: 1200, horasSuplementarias: 0, regimen: 'CODIGO_TRABAJO', categoriaLoep: 'servidor',
+  });
+  protected readonly regimen = signal('CODIGO_TRABAJO');
+  protected readonly categoria = signal('servidor');
+  protected readonly esMixto = computed(
+    () => this.ley()?.regimenes.find((r) => r.codigo === this.regimen())?.tipo === 'mixto',
+  );
 
   protected readonly entradaValida = computed(() => this.consulta().sueldo > 0);
 
-  protected readonly simulacion = httpResource<ResultadoRol>(() => {
+  protected readonly simulacion = httpResource<ResultadoSimulacion>(() => {
     const c = this.consulta();
     if (c.sueldo <= 0) return undefined;
-    return { url: '/api/simulacion', method: 'POST', body: { sueldo: c.sueldo, horasSuplementarias: c.horasSuplementarias } };
+    return {
+      url: '/api/simulacion',
+      method: 'POST',
+      body: {
+        sueldo: c.sueldo,
+        horasSuplementarias: c.horasSuplementarias,
+        regimen: c.regimen,
+        categoriaLoep: c.regimen === 'LOEP' ? c.categoriaLoep : undefined,
+      },
+    };
   });
 
   protected readonly resultado = valorSeguro(this.simulacion);
@@ -38,12 +57,21 @@ export class Landing {
     effect((alLimpiar) => {
       const sueldo = Number(this.sueldo().replace(',', '.'));
       const horasSuplementarias = Number(this.horas().replace(',', '.')) || 0;
+      const regimen = this.regimen();
+      const categoriaLoep = this.categoria();
       const temporizador = setTimeout(
-        () => this.consulta.set({ sueldo: Number.isFinite(sueldo) ? sueldo : 0, horasSuplementarias }),
+        () =>
+          this.consulta.set({
+            sueldo: Number.isFinite(sueldo) ? sueldo : 0, horasSuplementarias, regimen, categoriaLoep,
+          }),
         250,
       );
       alLimpiar(() => clearTimeout(temporizador));
     });
+  }
+
+  protected elegir(campo: 'regimen' | 'categoria', evento: Event) {
+    (campo === 'regimen' ? this.regimen : this.categoria).set((evento.target as HTMLSelectElement).value);
   }
 
   protected escribir(campo: 'sueldo' | 'horas', evento: Event) {
