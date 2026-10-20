@@ -98,20 +98,27 @@ import type { DatosEmpleado, Empleado, Grado, Puesto } from '../../core/modelos'
                 </span>
               }
             </div>
-          } @else if (exigeGrado()) {
+          }
+          @if (exigeGrado()) {
             <div class="campo c3">
-              <label for="escalaId">Grado de la escala salarial</label>
+              <label for="escalaId">{{ usaPuestos() ? 'Nivel que le toca (tabla salarial)' : 'Grado de la escala salarial' }}</label>
               <select class="entrada" id="escalaId" formControlName="escalaId"
                       (change)="elegirGrado($any($event.target).value)">
                 <option value="">Elige un grado de la tabla</option>
                 @for (g of grados(); track g.id) {
                   <option [value]="g.id">
                     Grado {{ g.grado }}: {{ g.denominacion }}
-                    ({{ g.esMinimo ? 'mínimo ' : '' }}{{ g.rmu | dinero }})
+                    ({{ g.esMinimo ? 'mínimo ' : '' }}{{ g.rmu | dinero }}{{ g.rmuMax ? ' a ' + (g.rmuMax | dinero) : '' }})
                   </option>
                 }
               </select>
-              <span class="ayuda">El grado fija el sueldo que se paga, según la tabla.</span>
+              <span class="ayuda">
+                @if (usaPuestos()) {
+                  Viene del puesto, pero puedes elegir otro nivel de la tabla si al trabajador le toca uno distinto.
+                } @else {
+                  El grado fija el sueldo que se paga, según la tabla.
+                }
+              </span>
             </div>
           }
           @if (gradoElegido(); as g) {
@@ -301,11 +308,12 @@ export class FormularioEmpleado {
     const grado = this.grados().find((g) => String(g.id) === valor);
     if (!grado) {
       this.form.controls.sueldoBase.setValue(null);
-      this.soltarCargoPropuesto();
+      if (!this.usaPuestos()) this.soltarCargoPropuesto();
       return;
     }
     this.form.controls.sueldoBase.setValue(grado.rmu);
-    this.proponerCargo(grado.denominacion);
+    // Con puestos, el cargo es el del puesto: el nivel solo cambia el sueldo.
+    if (!this.usaPuestos()) this.proponerCargo(grado.denominacion);
   }
 
   /** El cargo se reemplaza solo si está vacío o si es el que propuso la elección anterior: uno escrito a mano se respeta. */

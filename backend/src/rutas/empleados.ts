@@ -87,18 +87,21 @@ function validar(
   }
 
   // Grado de la escala salarial: si el régimen que se aplica tiene escala, el grado es obligatorio
-  // y debe ser de esa escala; si hay puesto, es el de su referencia. El sueldo sale de la tabla.
+  // y debe ser de esa escala; si hay puesto, se propone el de su referencia y se avisa si es otro. El sueldo sale de la tabla.
   let escalaId: number | null = null;
   const pedido = vacio(cuerpo.escalaId) && puestoId !== null ? puesto?.escalaId : cuerpo.escalaId;
   const hayPedido = !vacio(pedido);
   const grado = hayPedido ? buscarGrado(db, Number(pedido)) : undefined;
-  if (puestoId !== null && hayPedido && Number(pedido) !== puesto?.escalaId) {
-    errores.push(`El grado no corresponde al puesto «${puesto?.nombre}»: su referencia es otra.`);
-  } else if (hayPedido) {
+  if (hayPedido) {
     if (!grado) errores.push("El grado de la escala salarial no existe.");
     else if (aplicado && grado.regimen !== aplicado) {
       errores.push(`El grado ${grado.grado} es de la escala ${grado.regimen}, no de ${aplicado}.`);
-    } else escalaId = grado.id;
+    } else {
+      escalaId = grado.id;
+      if (puesto && grado.id !== puesto.escalaId) {
+        avisos.push(`Aviso: el nivel ${grado.denominacion} difiere de la referencia del puesto «${puesto.nombre}».`);
+      }
+    }
   } else if (aplicado && listarEscala(db, aplicado).length > 0) {
     errores.push(`Elige un grado de la escala salarial ${aplicado}: el sueldo se toma de la tabla.`);
   }
