@@ -1,14 +1,14 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
-import { iniciar } from "./ayuda.ts";
+import { iniciar, cargarEmpleadosDePrueba } from "./ayuda.ts";
 import type { Cliente } from "./ayuda.ts";
 
 /** Cada prueba usa su propia API con los 6 empleados de ejemplo. */
 async function conDemo(prueba: (api: Cliente) => Promise<void>) {
   const api = await iniciar();
   try {
-    await api.post("/api/empleados/demo");
+    await cargarEmpleadosDePrueba(api);
     await prueba(api);
   } finally {
     api.cerrar();

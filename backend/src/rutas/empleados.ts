@@ -1,7 +1,8 @@
 import { Router } from "express";
 import type { DatabaseSync } from "node:sqlite";
 
-import { CONTRATOS, EMPLEADOS_DEMO } from "../config.ts";
+import { CONTRATOS } from "../config.ts";
+import { cargarEmpleadosDemo } from "../demo.ts";
 import { MODALIDADES } from "../calculos.ts";
 import type { Modalidad } from "../calculos.ts";
 import { consultar, ejecutar, filaACamel, uno } from "../db.ts";
@@ -191,21 +192,7 @@ export function rutasEmpleados(db: DatabaseSync): Router {
   });
 
   router.post("/demo", (_req, res) => {
-    let nuevos = 0;
-    for (const e of EMPLEADOS_DEMO) {
-      const r = ejecutar(
-        db,
-        `INSERT OR IGNORE INTO empleados (cedula, nombres, cargo, sueldo_base, fecha_ingreso,
-         tipo_contrato, regimen, categoria_loep, escala_id, puesto_id)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?,
-                 (SELECT id FROM escala_salarial WHERE regimen = ? AND grado = ?),
-                 (SELECT id FROM puestos WHERE nombre = ?))`,
-        e.cedula, e.nombres, e.cargo, e.sueldoBase, e.fechaIngreso, e.tipoContrato, e.regimen, e.categoriaLoep,
-        e.escalaRegimen, e.escalaGrado, e.puesto,
-      );
-      nuevos += Number(r.changes);
-    }
-    res.status(201).json({ agregados: nuevos });
+    res.status(201).json({ agregados: cargarEmpleadosDemo(db) });
   });
 
   router.get("/:id", (req, res) => {
