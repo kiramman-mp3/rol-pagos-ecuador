@@ -8,7 +8,7 @@ import { firstValueFrom } from 'rxjs';
 import { Api, ParametrosLey, valorSeguro } from '../../core/api';
 import { Avisos } from '../../core/avisos';
 import { DineroPipe } from '../../core/dinero.pipe';
-import type { DatosEmpleado, Empleado } from '../../core/modelos';
+import type { DatosEmpleado, Empleado, Grado } from '../../core/modelos';
 
 /** Alta y edición: la ruta /empleados/:id/editar entrega `id`; /empleados/nuevo no. */
 @Component({
@@ -68,6 +68,19 @@ import type { DatosEmpleado, Empleado } from '../../core/modelos';
               <span class="ayuda">La categoría decide qué reglas se aplican en el rol.</span>
             </div>
           }
+          @if (grados().length) {
+            <div class="campo c3">
+              <label for="escalaId">Grado de la escala salarial</label>
+              <select class="entrada" id="escalaId" formControlName="escalaId"
+                      (change)="elegirGrado($any($event.target).value)">
+                <option value="">Sin grado: el sueldo se escribe a mano</option>
+                @for (g of grados(); track g.id) {
+                  <option [value]="g.id">Grado {{ g.grado }}: {{ g.denominacion }} ({{ g.rmu | dinero }})</option>
+                }
+              </select>
+              <span class="ayuda">Al elegir un grado se llena el sueldo con su remuneración. Puedes cambiarlo.</span>
+            </div>
+          }
           <div class="campo c3">
             <label for="sueldoBase">Sueldo base (USD)</label>
             <input class="entrada num" id="sueldoBase" type="number" step="0.01" min="0.01"
@@ -106,6 +119,7 @@ export class FormularioEmpleado {
     tipoContrato: ['Indefinido', Validators.required],
     regimen: ['CODIGO_TRABAJO', Validators.required],
     categoriaLoep: [''],
+    escalaId: [''],
     sueldoBase: [null as number | null, [Validators.required, Validators.min(0.01)]],
     fechaIngreso: ['', Validators.required],
   });
@@ -118,6 +132,22 @@ export class FormularioEmpleado {
   );
   protected readonly esMixto = computed(() => this.regimenElegido()?.tipo === 'mixto');
 
+  private readonly categoriaSeleccionada = toSignal(this.form.controls.categoriaLoep.valueChanges, {
+    initialValue: this.form.controls.categoriaLoep.value,
+  });
+  /** Régimen cuyas reglas (y escala) se aplican: en la LOEP lo decide la categoría. */
+  private readonly regimenQueSeAplica = computed(() => {
+    const r = this.regimenElegido();
+    if (r?.tipo !== 'mixto') return r?.codigo;
+    return this.categoriaSeleccionada() === 'obrero' ? r.regimenObrero : r.regimenServidor;
+  });
+
+  private readonly escala = valorSeguro(httpResource<Grado[]>(() => '/api/escala'));
+  protected readonly grados = computed(() => {
+    const aplicado = this.regimenQueSeAplica();
+    return (this.escala() ?? []).filter((g) => g.regimen === aplicado);
+  });
+
   private readonly actual = valorSeguro(
     httpResource<Empleado>(() => (this.id() ? `/api/empleados/${this.id()}` : undefined)),
   );
@@ -126,8 +156,26 @@ export class FormularioEmpleado {
     // Al llegar el empleado a editar, se llenan los campos.
     effect(() => {
       const e = this.actual();
-      if (e) this.form.patchValue({ ...e, categoriaLoep: e.categoriaLoep ?? '' });
+      if (e) {
+        this.form.patchValue({ ...e, categoriaLoep: e.categoriaLoep ?? '', escalaId: e.escalaId ? String(e.escalaId) : '' });
+      }
     });
+
+    // Si el régimen cambia y el grado elegido ya no pertenece a su escala, se quita.
+    effect(() => {
+      const grados = this.grados();
+      if (!this.escala()) return;
+      const actual = this.form.controls.escalaId.value;
+      if (actual && !grados.some((g) => String(g.id) === actual)) this.form.controls.escalaId.setValue('');
+    });
+  }
+
+  /** Elegir un grado propone su remuneración como sueldo y su denominación como cargo. */
+  protected elegirGrado(valor: string) {
+    const grado = this.grados().find((g) => String(g.id) === valor);
+    if (!grado) return;
+    this.form.controls.sueldoBase.setValue(grado.rmu);
+    if (!this.form.controls.cargo.value.trim()) this.form.controls.cargo.setValue(grado.denominacion);
   }
 
   protected async guardar() {
@@ -137,12 +185,16 @@ export class FormularioEmpleado {
       this.avisos.error('Completa todos los campos antes de guardar.');
       return;
     }
-    const { categoriaLoep, ...resto } = this.form.getRawValue();
+    const { categoriaLoep, escalaId, ...resto } = this.form.getRawValue();
     if (this.esMixto() && !categoriaLoep) {
       this.avisos.error('Elige si el empleado es servidor u obrero.');
       return;
     }
-    const datos = { ...resto, categoriaLoep: this.esMixto() ? categoriaLoep : null } as DatosEmpleado;
+    const datos = {
+      ...resto,
+      categoriaLoep: this.esMixto() ? categoriaLoep : null,
+      escalaId: escalaId ? Number(escalaId) : null,
+    } as DatosEmpleado;
     this.guardando.set(true);
     try {
       const id = this.id();
