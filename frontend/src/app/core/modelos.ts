@@ -78,7 +78,14 @@ export interface Regimen {
 }
 
 export interface Parametros {
+  /** Año cuyos valores se muestran (si el pedido no tiene, el más reciente anterior) */
   anio: number;
+  anioSolicitado: number;
+  /** false = no hay parámetros del año pedido y se usaron los de `anio` */
+  exacto: boolean;
+  /** Años que tienen parámetros guardados, del más reciente al más antiguo */
+  anios: number[];
+  fuente: string;
   sbu: number;
   iessPersonal: number;
   iessPatronal: number;
