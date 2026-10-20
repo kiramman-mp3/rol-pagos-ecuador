@@ -28,6 +28,8 @@ La base `backend/data/rol_pagos.db` se crea sola al arrancar. Si ya existía de 
 | `npm run dev` | Backend y frontend en modo desarrollo, con proxy de `/api` |
 | `npm test` | Pruebas del backend (Node) y del frontend (Vitest) |
 | `npm run lint` | Tipos y ESLint de ambos proyectos |
+| `npm --prefix backend run seed` | Llena una base vacía con 12 empleados y los roles de enero a septiembre de 2026 |
+| `npm --prefix backend run seed -- --reiniciar` | Igual, pero antes guarda una copia de la base actual (`rol_pagos.db.respaldo-…`) y empieza de cero |
 
 ## Qué pide la guía y cómo se cumple
 
@@ -89,7 +91,7 @@ frontend/                 Angular 22 (componentes standalone, señales, sin zone
 | `GET/POST /api/empleados` | Lista y alta |
 | `GET/PUT/DELETE /api/empleados/:id` | Consulta, edición y baja |
 | `PATCH /api/empleados/:id/estado` | Activa o desactiva |
-| `POST /api/empleados/demo` | Carga los 6 empleados de ejemplo |
+| `POST /api/empleados/demo` | Carga los 12 empleados de ejemplo (sin roles de pago) |
 | `GET /api/roles` | Historial de roles |
 | `GET /api/roles/periodo/:anio/:mes` | Empleados del mes, su régimen y las novedades ya digitadas |
 | `POST /api/roles/generar` | Calcula y guarda el rol (reemplaza el del mes) y devuelve los avisos |
@@ -153,6 +155,12 @@ Una escala por régimen. La de la LOSEP trae 22 grados, de $527 a $4.500, tomado
 Antes de asignar un sueldo se identifica el **puesto**. Cada puesto dice de quién depende, qué **función** cumple, de qué **responde**, en qué **sector económico** está y qué **nivel de la escala salarial** le sirve de referencia. El orgánico de ejemplo es: gerente/propietario → administrador/contador → supervisor de instalaciones, operaciones de instalaciones y auxiliar de guardalmacén (nivel A, B1, B3, C2 y E2 de la tabla del Código del Trabajo). Se ve y se edita en **Orgánico**.
 
 En el formulario del empleado, si el régimen aplicado tiene puestos, el puesto es obligatorio: al elegirlo se muestra su ficha, se preselecciona en un select el **nivel de la tabla que le toca** (con su mínimo y el tope del rango), se propone ese mínimo como sueldo y el nombre del puesto como cargo. El select solo ofrece los niveles de la misma letra que el del puesto (si el puesto es B3: B1, B2 y B3), y se puede cambiar por otro de ellos si al trabajador le toca uno distinto (se avisa que difiere del puesto), y la API rechaza un sueldo menor al mínimo del nivel. Los regímenes sin puestos (la LOSEP) siguen eligiendo directamente el grado. El **sector económico** de los puestos de ejemplo está en «Por definir» hasta saber la rama de la empresa, y los niveles asignados a cada puesto son una propuesta sobre una tabla de clase, por confirmar.
+
+### Datos de ejemplo
+
+El seed carga 12 empleados con la estructura del orgánico: Johan Gabriel Rodríguez (gerente), José Gabriel Manzano (administrador), David Barragán y Andrea Paola Villavicencio (supervisores de instalaciones), Maybeline Navarro, Santiago Andrés Cevallos y Karen Michelle Salazar (operaciones de instalaciones) y Pedro Pablo Guamán, Luis Fernando Tipán y Mayra Alejandra Chicaiza (auxiliares de guardalmacén), más Lucía Estefanía Mora (LOSEP) y Daniela Alejandra Ruiz (LOEP servidora) para mostrar los otros regímenes. Cada uno cobra al menos el mínimo del nivel de su puesto.
+
+`npm run seed` también genera los roles de pago de **enero a septiembre de 2026**, dejando octubre para generarlo a mano. Los empleados aparecen en los roles desde su fecha de ingreso (Mayra desde marzo; Pedro, que ingresó el 16 de octubre, en ninguno). El personal de campo tiene horas extras y algún anticipo descontado, siempre los mismos valores para que la demostración sea repetible. Las cédulas son válidas pero inventadas.
 
 ### Conciliación con el IESS
 

@@ -79,9 +79,9 @@ describe("API de empleados", () => {
   it("carga los datos de ejemplo una sola vez", async () => {
     const limpia = await iniciar();
     try {
-      assert.equal((await limpia.post("/api/empleados/demo")).json.agregados, 6);
+      assert.equal((await limpia.post("/api/empleados/demo")).json.agregados, 12);
       assert.equal((await limpia.post("/api/empleados/demo")).json.agregados, 0);
-      assert.equal((await limpia.get("/api/empleados")).json.length, 6);
+      assert.equal((await limpia.get("/api/empleados")).json.length, 12);
     } finally {
       limpia.cerrar();
     }

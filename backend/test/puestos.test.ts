@@ -128,15 +128,32 @@ describe("empleados y orgánico", () => {
       assert.equal(despues.sueldoBase, EMPLEADO.sueldoBase);
     }));
 
-  it("en los datos de ejemplo, el personal del Código del Trabajo ocupa su puesto", () =>
+  it("en los datos de ejemplo, cada empleado del Código del Trabajo ocupa su puesto", () =>
     conApi(async (api) => {
       await api.post("/api/empleados/demo");
       const lista = (await api.get("/api/empleados")).json;
+      assert.equal(lista.length, 12);
       const puestoDe = (nombre: string) => lista.find((e: { nombres: string }) => e.nombres.startsWith(nombre)).puestoId;
-      assert.equal(puestoDe("María"), 1);
-      assert.equal(puestoDe("Carlos"), 2);
-      assert.equal(puestoDe("José"), 3);
+      assert.equal(puestoDe("Johan"), 1);
+      assert.equal(puestoDe("José"), 2);
+      assert.equal(puestoDe("David"), 3);
+      assert.equal(puestoDe("Maybeline"), 4);
       assert.equal(puestoDe("Pedro"), PUESTO_AUXILIAR);
       assert.equal(puestoDe("Lucía"), null); // LOSEP: sin puestos en el orgánico
+      // mismo orgánico: 1 gerente, 1 administrador, 2 supervisores, 3 de operaciones, 3 auxiliares (con Pedro)
+      const porPuesto = (await api.get("/api/puestos")).json.map((p: { empleados: number }) => p.empleados);
+      assert.deepEqual(porPuesto, [1, 1, 2, 3, 3]);
+    }));
+
+  it("los empleados de ejemplo cobran al menos el mínimo del nivel de su puesto", () =>
+    conApi(async (api) => {
+      await api.post("/api/empleados/demo");
+      const puestos = (await api.get("/api/puestos")).json;
+      for (const e of (await api.get("/api/empleados")).json) {
+        if (e.puestoId === null) continue;
+        const puesto = puestos.find((p: { id: number }) => p.id === e.puestoId);
+        assert.equal(e.escalaId, puesto.escalaId, e.nombres);
+        assert.ok(e.sueldoBase >= puesto.referencia.rmu, `${e.nombres} cobra menos del mínimo de su nivel`);
+      }
     }));
 });

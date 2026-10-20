@@ -25,12 +25,22 @@ export interface EmpleadoDemo {
   puesto: string | null;
 }
 
-/** Seis empleados que muestran los tres regímenes (Código del Trabajo, LOSEP y LOEP). */
+/**
+ * Doce empleados con la estructura del orgánico funcional (gerente -> administrador -> supervisor,
+ * operaciones y auxiliar de guardalmacén), más dos de la LOSEP y la LOEP que muestran los otros regímenes.
+ * Cada uno cobra al menos el mínimo del nivel de su puesto.
+ */
 export const EMPLEADOS_DEMO: readonly EmpleadoDemo[] = [
-  { cedula: "1801234566", nombres: "María Fernanda Paredes", cargo: "Gerente General", sueldoBase: 4500, fechaIngreso: "2019-03-01", tipoContrato: "Indefinido", regimen: "CODIGO_TRABAJO", categoriaLoep: null, escalaRegimen: "CODIGO_TRABAJO", escalaGrado: 1, puesto: "Gerente / Propietario" },
-  { cedula: "1702345677", nombres: "Carlos Andrés Villacís", cargo: "Contador", sueldoBase: 1800, fechaIngreso: "2022-07-15", tipoContrato: "Indefinido", regimen: "CODIGO_TRABAJO", categoriaLoep: null, escalaRegimen: "CODIGO_TRABAJO", escalaGrado: 2, puesto: "Administrador / Contador" },
+  { cedula: "1712345675", nombres: "Johan Gabriel Rodríguez", cargo: "Gerente / Propietario", sueldoBase: 2800, fechaIngreso: "2019-03-01", tipoContrato: "Indefinido", regimen: "CODIGO_TRABAJO", categoriaLoep: null, escalaRegimen: "CODIGO_TRABAJO", escalaGrado: 1, puesto: "Gerente / Propietario" },
+  { cedula: "1703456788", nombres: "José Gabriel Manzano", cargo: "Administrador / Contador", sueldoBase: 1500, fechaIngreso: "2021-06-01", tipoContrato: "Indefinido", regimen: "CODIGO_TRABAJO", categoriaLoep: null, escalaRegimen: "CODIGO_TRABAJO", escalaGrado: 2, puesto: "Administrador / Contador" },
   { cedula: "0903456788", nombres: "Lucía Estefanía Mora", cargo: "Asistente Administrativa", sueldoBase: 675, fechaIngreso: "2024-02-01", tipoContrato: "Plazo fijo", regimen: "LOSEP", categoriaLoep: null, escalaRegimen: "LOSEP", escalaGrado: 5, puesto: null },
-  { cedula: "0104567896", nombres: "José Luis Camacho", cargo: "Supervisor de instalaciones", sueldoBase: 900, fechaIngreso: "2025-11-03", tipoContrato: "Indefinido", regimen: "CODIGO_TRABAJO", categoriaLoep: null, escalaRegimen: "CODIGO_TRABAJO", escalaGrado: 4, puesto: "Supervisor de instalaciones" },
+  { cedula: "1710456797", nombres: "David Barragán", cargo: "Supervisor de instalaciones", sueldoBase: 850, fechaIngreso: "2022-09-12", tipoContrato: "Indefinido", regimen: "CODIGO_TRABAJO", categoriaLoep: null, escalaRegimen: "CODIGO_TRABAJO", escalaGrado: 4, puesto: "Supervisor de instalaciones" },
   { cedula: "1715678908", nombres: "Daniela Alejandra Ruiz", cargo: "Analista de Sistemas", sueldoBase: 2670, fechaIngreso: "2023-05-10", tipoContrato: "Indefinido", regimen: "LOEP", categoriaLoep: "servidor", escalaRegimen: "LOSEP", escalaGrado: 19, puesto: null },
   { cedula: "0606789014", nombres: "Pedro Pablo Guamán", cargo: "Auxiliar de guardalmacén", sueldoBase: 482, fechaIngreso: "2026-10-16", tipoContrato: "Eventual", regimen: "LOEP", categoriaLoep: "obrero", escalaRegimen: "CODIGO_TRABAJO", escalaGrado: 11, puesto: "Auxiliar de guardalmacén" },
+  { cedula: "1714567805", nombres: "Maybeline Navarro", cargo: "Operaciones de instalaciones", sueldoBase: 600, fechaIngreso: "2023-04-03", tipoContrato: "Indefinido", regimen: "CODIGO_TRABAJO", categoriaLoep: null, escalaRegimen: "CODIGO_TRABAJO", escalaGrado: 6, puesto: "Operaciones de instalaciones" },
+  { cedula: "1705678918", nombres: "Andrea Paola Villavicencio", cargo: "Supervisor de instalaciones", sueldoBase: 720, fechaIngreso: "2024-01-15", tipoContrato: "Indefinido", regimen: "CODIGO_TRABAJO", categoriaLoep: null, escalaRegimen: "CODIGO_TRABAJO", escalaGrado: 4, puesto: "Supervisor de instalaciones" },
+  { cedula: "1706789029", nombres: "Santiago Andrés Cevallos", cargo: "Operaciones de instalaciones", sueldoBase: 640, fechaIngreso: "2024-08-01", tipoContrato: "Indefinido", regimen: "CODIGO_TRABAJO", categoriaLoep: null, escalaRegimen: "CODIGO_TRABAJO", escalaGrado: 6, puesto: "Operaciones de instalaciones" },
+  { cedula: "1707890131", nombres: "Karen Michelle Salazar", cargo: "Operaciones de instalaciones", sueldoBase: 620, fechaIngreso: "2025-02-10", tipoContrato: "Plazo fijo", regimen: "CODIGO_TRABAJO", categoriaLoep: null, escalaRegimen: "CODIGO_TRABAJO", escalaGrado: 6, puesto: "Operaciones de instalaciones" },
+  { cedula: "1718901240", nombres: "Luis Fernando Tipán", cargo: "Auxiliar de guardalmacén", sueldoBase: 500, fechaIngreso: "2025-07-01", tipoContrato: "Indefinido", regimen: "CODIGO_TRABAJO", categoriaLoep: null, escalaRegimen: "CODIGO_TRABAJO", escalaGrado: 11, puesto: "Auxiliar de guardalmacén" },
+  { cedula: "1709012353", nombres: "Mayra Alejandra Chicaiza", cargo: "Auxiliar de guardalmacén", sueldoBase: 482, fechaIngreso: "2026-03-02", tipoContrato: "Plazo fijo", regimen: "CODIGO_TRABAJO", categoriaLoep: null, escalaRegimen: "CODIGO_TRABAJO", escalaGrado: 11, puesto: "Auxiliar de guardalmacén" },
 ];
