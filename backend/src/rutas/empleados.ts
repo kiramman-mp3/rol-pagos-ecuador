@@ -8,6 +8,7 @@ import { consultar, ejecutar, filaACamel, uno } from "../db.ts";
 import type { Fila } from "../db.ts";
 import { parametrosDelAnio } from "../parametros.ts";
 import { buscarGrado, listarEscala } from "../escala.ts";
+import { buscarPuesto, listarPuestos } from "../puestos.ts";
 import { CATEGORIAS_LOEP, indexarRegimenes, listarRegimenes, regimenAplicado } from "../regimenes.ts";
 import { aDecimal, cedulaValida, ErrorApi, fechaIsoValida } from "../validaciones.ts";
 
@@ -21,6 +22,7 @@ interface DatosEmpleado {
   regimen: string;
   categoriaLoep: string | null;
   escalaId: number | null;
+  puestoId: number | null;
   /** null = lo que diga el régimen */
   pagoDecimoTercero: Modalidad | null;
   pagoDecimoCuarto: Modalidad | null;
@@ -60,12 +62,7 @@ function validar(
     }
   }
 
-  // Grado de la escala salarial: si el régimen que se aplica tiene escala, el grado es obligatorio
-  // y debe ser de esa escala; el sueldo sale de la tabla.
-  let escalaId: number | null = null;
-  const pedido = cuerpo.escalaId;
-  const hayPedido = pedido !== null && pedido !== undefined && pedido !== "";
-  const grado = hayPedido ? buscarGrado(db, Number(pedido)) : undefined;
+  const vacio = (v: unknown) => v === null || v === undefined || v === "";
   let aplicado: string | null = null;
   if (elegido) {
     try {
@@ -74,7 +71,30 @@ function validar(
       /* la categoría faltante ya quedó reportada arriba */
     }
   }
-  if (hayPedido) {
+
+  // Puesto del orgánico: si el régimen aplicado tiene puestos, se identifica primero (función,
+  // responsabilidad, sector) y de él sale el nivel de la escala que sirve de referencia al sueldo.
+  let puestoId: number | null = null;
+  const puesto = vacio(cuerpo.puestoId) ? undefined : buscarPuesto(db, Number(cuerpo.puestoId));
+  const hayPuestos = aplicado !== null && listarPuestos(db).some((p) => p.referencia?.regimen === aplicado);
+  if (!vacio(cuerpo.puestoId)) {
+    if (!puesto) errores.push("El puesto no existe.");
+    else if (aplicado && puesto.referencia && puesto.referencia.regimen !== aplicado) {
+      errores.push(`El puesto «${puesto.nombre}» es de la escala ${puesto.referencia.regimen}, no de ${aplicado}.`);
+    } else puestoId = puesto.id;
+  } else if (hayPuestos) {
+    errores.push("Elige el puesto del orgánico: de él sale la función y el nivel salarial de referencia.");
+  }
+
+  // Grado de la escala salarial: si el régimen que se aplica tiene escala, el grado es obligatorio
+  // y debe ser de esa escala; si hay puesto, es el de su referencia. El sueldo sale de la tabla.
+  let escalaId: number | null = null;
+  const pedido = vacio(cuerpo.escalaId) && puestoId !== null ? puesto?.escalaId : cuerpo.escalaId;
+  const hayPedido = !vacio(pedido);
+  const grado = hayPedido ? buscarGrado(db, Number(pedido)) : undefined;
+  if (puestoId !== null && hayPedido && Number(pedido) !== puesto?.escalaId) {
+    errores.push(`El grado no corresponde al puesto «${puesto?.nombre}»: su referencia es otra.`);
+  } else if (hayPedido) {
     if (!grado) errores.push("El grado de la escala salarial no existe.");
     else if (aplicado && grado.regimen !== aplicado) {
       errores.push(`El grado ${grado.grado} es de la escala ${grado.regimen}, no de ${aplicado}.`);
@@ -127,7 +147,7 @@ function validar(
   if (errores.length) throw new ErrorApi(400, errores);
   return {
     datos: {
-      cedula, nombres, cargo, sueldoBase, fechaIngreso, tipoContrato, regimen, categoriaLoep, escalaId,
+      cedula, nombres, cargo, sueldoBase, fechaIngreso, tipoContrato, regimen, categoriaLoep, escalaId, puestoId,
       pagoDecimoTercero, pagoDecimoCuarto, pagoFondosReserva, recibeHorasExtras,
     },
     avisos,
@@ -171,11 +191,12 @@ export function rutasEmpleados(db: DatabaseSync): Router {
       const r = ejecutar(
         db,
         `INSERT OR IGNORE INTO empleados (cedula, nombres, cargo, sueldo_base, fecha_ingreso,
-         tipo_contrato, regimen, categoria_loep, escala_id)
+         tipo_contrato, regimen, categoria_loep, escala_id, puesto_id)
          VALUES (?, ?, ?, ?, ?, ?, ?, ?,
-                 (SELECT id FROM escala_salarial WHERE regimen = ? AND grado = ?))`,
+                 (SELECT id FROM escala_salarial WHERE regimen = ? AND grado = ?),
+                 (SELECT id FROM puestos WHERE nombre = ?))`,
         e.cedula, e.nombres, e.cargo, e.sueldoBase, e.fechaIngreso, e.tipoContrato, e.regimen, e.categoriaLoep,
-        e.escalaRegimen, e.escalaGrado,
+        e.escalaRegimen, e.escalaGrado, e.puesto,
       );
       nuevos += Number(r.changes);
     }
@@ -193,10 +214,10 @@ export function rutasEmpleados(db: DatabaseSync): Router {
       const r = ejecutar(
         db,
         `INSERT INTO empleados (cedula, nombres, cargo, sueldo_base, fecha_ingreso, tipo_contrato,
-         regimen, categoria_loep, escala_id, pago_decimo_tercero, pago_decimo_cuarto,
-         pago_fondos_reserva, recibe_horas_extras) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+         regimen, categoria_loep, escala_id, puesto_id, pago_decimo_tercero, pago_decimo_cuarto,
+         pago_fondos_reserva, recibe_horas_extras) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         datos.cedula, datos.nombres, datos.cargo, datos.sueldoBase, datos.fechaIngreso,
-        datos.tipoContrato, datos.regimen, datos.categoriaLoep, datos.escalaId,
+        datos.tipoContrato, datos.regimen, datos.categoriaLoep, datos.escalaId, datos.puestoId,
         datos.pagoDecimoTercero, datos.pagoDecimoCuarto, datos.pagoFondosReserva,
         datos.recibeHorasExtras === null ? null : Number(datos.recibeHorasExtras),
       );
@@ -212,11 +233,11 @@ export function rutasEmpleados(db: DatabaseSync): Router {
       ejecutar(
         db,
         `UPDATE empleados SET cedula = ?, nombres = ?, cargo = ?, sueldo_base = ?,
-         fecha_ingreso = ?, tipo_contrato = ?, regimen = ?, categoria_loep = ?, escala_id = ?,
+         fecha_ingreso = ?, tipo_contrato = ?, regimen = ?, categoria_loep = ?, escala_id = ?, puesto_id = ?,
          pago_decimo_tercero = ?, pago_decimo_cuarto = ?, pago_fondos_reserva = ?, recibe_horas_extras = ?
          WHERE id = ?`,
         datos.cedula, datos.nombres, datos.cargo, datos.sueldoBase, datos.fechaIngreso,
-        datos.tipoContrato, datos.regimen, datos.categoriaLoep, datos.escalaId,
+        datos.tipoContrato, datos.regimen, datos.categoriaLoep, datos.escalaId, datos.puestoId,
         datos.pagoDecimoTercero, datos.pagoDecimoCuarto, datos.pagoFondosReserva,
         datos.recibeHorasExtras === null ? null : Number(datos.recibeHorasExtras), actual.id,
       );

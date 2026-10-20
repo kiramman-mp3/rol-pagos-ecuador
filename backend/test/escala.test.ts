@@ -81,7 +81,7 @@ describe("empleados y escala salarial", () => {
     conApi(async (api) => {
       const g5 = await gradoDe(api, 5);
       const r = await api.post("/api/empleados", {
-        ...EMPLEADO, regimen: "LOSEP", sueldoBase: g5.rmu, escalaId: g5.id,
+        ...EMPLEADO, puestoId: null, regimen: "LOSEP", sueldoBase: g5.rmu, escalaId: g5.id,
       });
       assert.equal(r.status, 201);
       assert.equal(r.json.escalaId, g5.id);
@@ -92,7 +92,7 @@ describe("empleados y escala salarial", () => {
     conApi(async (api) => {
       const g5 = await gradoDe(api, 5);
       const r = await api.post("/api/empleados", {
-        ...EMPLEADO, regimen: "LOSEP", sueldoBase: 700, escalaId: g5.id,
+        ...EMPLEADO, puestoId: null, regimen: "LOSEP", sueldoBase: 700, escalaId: g5.id,
       });
       assert.equal(r.status, 400);
       assert.match(r.json.errores[0], /debe ser la RMU del grado 5 \(\$675\)/);
@@ -101,17 +101,17 @@ describe("empleados y escala salarial", () => {
   it("un grado de otra escala se rechaza", () =>
     conApi(async (api) => {
       const g5 = await gradoDe(api, 5);
-      const r = await api.post("/api/empleados", { ...EMPLEADO, regimen: "CODIGO_TRABAJO", escalaId: g5.id });
+      const r = await api.post("/api/empleados", { ...EMPLEADO, puestoId: null, regimen: "CODIGO_TRABAJO", escalaId: g5.id });
       assert.equal(r.status, 400);
-      assert.match(r.json.errores[0], /escala LOSEP, no de CODIGO_TRABAJO/);
-      assert.equal((await api.post("/api/empleados", { ...EMPLEADO, regimen: "LOSEP", escalaId: 9999 })).status, 400);
+      assert.ok(r.json.errores.some((e: string) => /escala LOSEP, no de CODIGO_TRABAJO/.test(e)));
+      assert.equal((await api.post("/api/empleados", { ...EMPLEADO, puestoId: null, regimen: "LOSEP", escalaId: 9999 })).status, 400);
     }));
 
   it("un servidor de la LOEP usa la escala de la LOSEP; un obrero no", () =>
     conApi(async (api) => {
       const g7 = await gradoDe(api, 7);
       const servidor = await api.post("/api/empleados", {
-        ...EMPLEADO, regimen: "LOEP", categoriaLoep: "servidor", sueldoBase: g7.rmu, escalaId: g7.id,
+        ...EMPLEADO, puestoId: null, regimen: "LOEP", categoriaLoep: "servidor", sueldoBase: g7.rmu, escalaId: g7.id,
       });
       assert.equal(servidor.status, 201);
       const obrero = await api.post("/api/empleados", {
@@ -122,7 +122,7 @@ describe("empleados y escala salarial", () => {
 
   it("un régimen con escala exige elegir un grado", () =>
     conApi(async (api) => {
-      const r = await api.post("/api/empleados", { ...EMPLEADO, regimen: "LOSEP", escalaId: null });
+      const r = await api.post("/api/empleados", { ...EMPLEADO, puestoId: null, regimen: "LOSEP", escalaId: null });
       assert.equal(r.status, 400);
       assert.match(r.json.errores[0], /Elige un grado de la escala salarial LOSEP/);
     }));
@@ -130,24 +130,25 @@ describe("empleados y escala salarial", () => {
   it("en un nivel de mínimo el sueldo puede ser mayor, pero no menor", () =>
     conApi(async (api) => {
       const b1 = await gradoDe(api, 2, "CODIGO_TRABAJO"); // B1, mínimo $495
-      const mayor = await api.post("/api/empleados", { ...EMPLEADO, sueldoBase: 900, escalaId: b1.id });
+      const mayor = await api.post("/api/empleados", { ...EMPLEADO, puestoId: 2, sueldoBase: 900, escalaId: b1.id });
       assert.equal(mayor.status, 201);
-      const menor = await api.post("/api/empleados", { ...EMPLEADO, cedula: "1702345677", sueldoBase: 490, escalaId: b1.id });
+      const menor = await api.post("/api/empleados", { ...EMPLEADO, puestoId: 2, cedula: "1702345677", sueldoBase: 490, escalaId: b1.id });
       assert.equal(menor.status, 400);
       assert.match(menor.json.errores[0], /no puede ser menor al mínimo del nivel B1: Supervisión general \(\$495\)/);
     }));
 
-  it("el Código del Trabajo también exige elegir un nivel", () =>
+  it("el Código del Trabajo exige elegir el puesto, del que sale el nivel", () =>
     conApi(async (api) => {
-      const r = await api.post("/api/empleados", { ...EMPLEADO, escalaId: null });
+      const r = await api.post("/api/empleados", { ...EMPLEADO, puestoId: null, escalaId: null });
       assert.equal(r.status, 400);
-      assert.match(r.json.errores[0], /Elige un grado de la escala salarial CODIGO_TRABAJO/);
+      assert.match(r.json.errores[0], /Elige el puesto del orgánico/);
     }));
 
   it("un régimen sin escala no pide grado y deja el sueldo libre", () =>
     conApi(async (api) => {
       for (const g of (await api.get("/api/escala?regimen=CODIGO_TRABAJO")).json) await api.del(`/api/escala/${g.id}`);
-      const r = await api.post("/api/empleados", { ...EMPLEADO, escalaId: null });
+      for (const p of (await api.get("/api/puestos")).json) await api.del(`/api/puestos/${p.id}`);
+      const r = await api.post("/api/empleados", { ...EMPLEADO, puestoId: null, escalaId: null });
       assert.equal(r.status, 201);
       assert.equal(r.json.escalaId, null);
     }));
@@ -156,7 +157,7 @@ describe("empleados y escala salarial", () => {
     conApi(async (api) => {
       const g5 = await gradoDe(api, 5);
       const { json: ana } = await api.post("/api/empleados", {
-        ...EMPLEADO, regimen: "LOSEP", sueldoBase: g5.rmu, escalaId: g5.id,
+        ...EMPLEADO, puestoId: null, regimen: "LOSEP", sueldoBase: g5.rmu, escalaId: g5.id,
       });
       await api.del(`/api/escala/${g5.id}`);
       const despues = (await api.get(`/api/empleados/${ana.id}`)).json;

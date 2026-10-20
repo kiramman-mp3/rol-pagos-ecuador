@@ -59,8 +59,12 @@ export async function iniciar(): Promise<Cliente> {
 /** Id del nivel E2 (mínimo $482) de la escala del Código del Trabajo: el último que siembra la migración 007. */
 export const NIVEL_E2_CT = 33;
 
-/** Empleado válido del Código del Trabajo, que exige un nivel de su escala (el sueldo puede superar el mínimo). */
+/** Puesto "Auxiliar de guardalmacén" del orgánico de ejemplo (nivel E2). */
+export const PUESTO_AUXILIAR = 5;
+
+/** Empleado válido del Código del Trabajo: exige un puesto del orgánico y su nivel (el sueldo puede superar el mínimo). */
 export const EMPLEADO = {
   cedula: "1801234566", nombres: "Ana Prueba", cargo: "Analista",
   sueldoBase: 1000, fechaIngreso: "2024-01-10", tipoContrato: "Indefinido", escalaId: NIVEL_E2_CT,
+  puestoId: PUESTO_AUXILIAR,
 };
