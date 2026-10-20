@@ -230,7 +230,9 @@ export class DetalleRol {
   });
 
   protected horasExtra(d: RolDetalle): number {
-    return sumar([d.valorHoras50, d.valorHoras100, d.valorRecargoNocturno]);
+    return sumar([
+      d.valorHorasSuplementarias, d.valorHorasExtraordinarias, d.valorHorasDescanso, d.valorRecargoNocturno,
+    ]);
   }
 
   protected imprimir() {

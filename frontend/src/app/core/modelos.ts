@@ -41,11 +41,13 @@ export interface ResultadoRol {
   mesesServicio: number;
   valorHora: number;
   sueldo: number;
-  horas50: number;
-  horas100: number;
+  horasSuplementarias: number;
+  horasExtraordinarias: number;
+  horasDescanso: number;
   horasNocturnas: number;
-  valorHoras50: number;
-  valorHoras100: number;
+  valorHorasSuplementarias: number;
+  valorHorasExtraordinarias: number;
+  valorHorasDescanso: number;
   valorRecargoNocturno: number;
   comisiones: number;
   totalIngresos: number;
@@ -93,8 +95,9 @@ export interface RolCompleto extends RolCabecera {
 }
 
 export interface Novedades {
-  horas50: number;
-  horas100: number;
+  horasSuplementarias: number;
+  horasExtraordinarias: number;
+  horasDescanso: number;
   horasNocturnas: number;
   comisiones: number;
   otrosDescuentos: number;
@@ -117,7 +120,7 @@ export interface Periodo {
 
 export interface EntradaSimulacion {
   sueldo: number;
-  horas50?: number;
-  horas100?: number;
+  horasSuplementarias?: number;
+  horasExtraordinarias?: number;
   comisiones?: number;
 }

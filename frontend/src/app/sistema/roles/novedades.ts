@@ -18,8 +18,9 @@ interface Fila extends NovedadEnviada {
 }
 
 const COLUMNAS: { campo: Campo; etiqueta: string; corte?: boolean }[] = [
-  { campo: 'horas50', etiqueta: 'Horas suplementarias', corte: true },
-  { campo: 'horas100', etiqueta: 'Horas extraordinarias' },
+  { campo: 'horasSuplementarias', etiqueta: 'Horas suplementarias', corte: true },
+  { campo: 'horasExtraordinarias', etiqueta: 'Horas extraordinarias' },
+  { campo: 'horasDescanso', etiqueta: 'Horas en sábado, domingo o feriado' },
   { campo: 'horasNocturnas', etiqueta: 'Horas nocturnas' },
   { campo: 'comisiones', etiqueta: 'Comisiones y bonos' },
   { campo: 'otrosDescuentos', etiqueta: 'Anticipos y otros descuentos', corte: true },
@@ -60,13 +61,14 @@ const COLUMNAS: { campo: Campo; etiqueta: string; corte?: boolean }[] = [
                   <tr>
                     <th rowspan="2">Empleado</th>
                     <th rowspan="2" class="num">Sueldo base</th>
-                    <th colspan="4" class="g-ingresos t-ingresos corte">Suma al ingreso</th>
+                    <th colspan="5" class="g-ingresos t-ingresos corte">Suma al ingreso</th>
                     <th class="g-descuentos t-descuentos corte">Se descuenta</th>
                   </tr>
                   <tr>
-                    <th class="num corte">Horas suplementarias (+50%)</th>
-                    <th class="num">Horas extraordinarias (+100%)</th>
-                    <th class="num">Horas nocturnas (+25%)</th>
+                    <th class="num corte">Horas suplementarias</th>
+                    <th class="num">Horas extraordinarias</th>
+                    <th class="num">Sábado, domingo o feriado</th>
+                    <th class="num">Horas nocturnas</th>
                     <th class="num">Comisiones y bonos ($)</th>
                     <th class="num corte">Anticipos y otros ($)</th>
                   </tr>
@@ -103,9 +105,10 @@ const COLUMNAS: { campo: Campo; etiqueta: string; corte?: boolean }[] = [
         <div class="hoja" style="margin-top: 1.5rem">
           <div class="hoja-cuerpo pequeno apoyo">
             <p>
-              <strong>Cómo se valoran las horas.</strong> El valor de una hora es el sueldo base dividido para 240.
-              Las suplementarias se pagan a 1.5 veces ese valor y las extraordinarias (sábados, domingos y feriados)
-              a 2 veces. En las nocturnas solo se suma el recargo del 25%, porque la hora ya está dentro del sueldo.
+              <strong>Cómo se valoran las horas.</strong> El valor de una hora es el sueldo base dividido para 240,
+              más el recargo del régimen del empleado. Las suplementarias son las que siguen a la jornada hasta las
+              24h00; las extraordinarias van de 24h00 a 06h00 en días hábiles; las de sábado, domingo y feriado tienen
+              su propio recargo. En las nocturnas solo se suma el recargo, porque la hora ya está dentro del sueldo.
             </p>
             <p style="margin: 0">Quien ingresó durante el mes cobra solo los días trabajados.</p>
           </div>
@@ -152,8 +155,9 @@ export class NovedadesMes {
           nombres: e.nombres,
           cargo: e.cargo,
           sueldoBase: e.sueldoBase,
-          horas50: texto(e.novedades.horas50),
-          horas100: texto(e.novedades.horas100),
+          horasSuplementarias: texto(e.novedades.horasSuplementarias),
+          horasExtraordinarias: texto(e.novedades.horasExtraordinarias),
+          horasDescanso: texto(e.novedades.horasDescanso),
           horasNocturnas: texto(e.novedades.horasNocturnas),
           comisiones: texto(e.novedades.comisiones),
           otrosDescuentos: texto(e.novedades.otrosDescuentos),
@@ -171,14 +175,19 @@ export class NovedadesMes {
     this.generando.set(true);
     try {
       const novedades: NovedadEnviada[] = this.filas().map(
-        ({ empleadoId, horas50, horas100, horasNocturnas, comisiones, otrosDescuentos }) => ({
-          empleadoId, horas50, horas100, horasNocturnas, comisiones, otrosDescuentos,
+        ({
+          empleadoId, horasSuplementarias, horasExtraordinarias, horasDescanso, horasNocturnas,
+          comisiones, otrosDescuentos,
+        }) => ({
+          empleadoId, horasSuplementarias, horasExtraordinarias, horasDescanso, horasNocturnas,
+          comisiones, otrosDescuentos,
         }),
       );
       const r = await firstValueFrom(
         this.api.generarRol(Number(this.anio()), Number(this.mes()), novedades),
       );
       this.avisos.exito(`Rol de ${this.nombreMes()} ${this.anio()} generado para ${r.empleados} empleados.`);
+      r.avisos?.forEach((a) => this.avisos.aviso(a));
       await this.router.navigate(['/sistema/roles', r.id]);
     } catch (error) {
       this.avisos.errorHttp(error);
