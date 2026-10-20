@@ -14,6 +14,12 @@ const PARAMETROS = {
   ],
 };
 
+const GRADOS = [
+  { id: 11, regimen: 'LOSEP', grado: 5, denominacion: 'Servidor Público de Apoyo 3', rmu: 675, fuente: '' },
+  { id: 12, regimen: 'LOSEP', grado: 7, denominacion: 'Servidor Público 1', rmu: 817, fuente: '' },
+  { id: 13, regimen: 'CODIGO_TRABAJO', grado: 1, denominacion: 'Operario', rmu: 500, fuente: '' },
+];
+
 describe('FormularioEmpleado', () => {
   let http: HttpTestingController;
 
@@ -28,7 +34,14 @@ describe('FormularioEmpleado', () => {
     const fixture = TestBed.createComponent(FormularioEmpleado);
     fixture.detectChanges();
     TestBed.tick();
-    http.expectOne('/api/parametros').flush(PARAMETROS);
+    http.expectOne('/api/parametros').flush({
+      ...PARAMETROS,
+      regimenes: [
+        ...PARAMETROS.regimenes.slice(0, 2),
+        { ...PARAMETROS.regimenes[2], regimenServidor: 'LOSEP', regimenObrero: 'CODIGO_TRABAJO' },
+      ],
+    });
+    http.expectOne('/api/escala').flush(GRADOS);
     await fixture.whenStable();
     fixture.detectChanges();
     return { fixture, el: fixture.nativeElement as HTMLElement };
@@ -101,5 +114,75 @@ describe('FormularioEmpleado', () => {
     const envio = http.expectOne('/api/empleados');
     expect(envio.request.body.regimen).toBe('LOEP');
     expect(envio.request.body.categoriaLoep).toBe('obrero');
+  });
+
+  it('ofrece solo los grados de la escala del régimen elegido', async () => {
+    const { fixture, el } = await abrir();
+    expect(el.querySelector('#escalaId option[value="13"]')).not.toBeNull(); // Código del Trabajo
+    expect(el.querySelector('#escalaId option[value="11"]')).toBeNull();
+
+    escribir(el, 'regimen', 'LOSEP', 'change');
+    fixture.detectChanges();
+    const opciones = [...el.querySelectorAll('#escalaId option')].map((o) => o.textContent?.trim());
+    expect(opciones.some((t) => t?.includes('Grado 5'))).toBe(true);
+    expect(opciones.some((t) => t?.includes('Operario'))).toBe(false);
+  });
+
+  it('elegir un grado propone el sueldo y el cargo, y se envía el grado', async () => {
+    const { fixture, el } = await abrir();
+    escribir(el, 'cedula', '1801234566');
+    escribir(el, 'nombres', 'Ana Prueba');
+    escribir(el, 'fechaIngreso', '2024-01-10');
+    escribir(el, 'regimen', 'LOSEP', 'change');
+    fixture.detectChanges();
+
+    escribir(el, 'escalaId', '11', 'change');
+    fixture.detectChanges();
+    expect(el.querySelector<HTMLInputElement>('#sueldoBase')!.value).toBe('675');
+    expect(el.querySelector<HTMLInputElement>('#cargo')!.value).toBe('Servidor Público de Apoyo 3');
+
+    el.querySelector('form')!.dispatchEvent(new Event('submit'));
+    const envio = http.expectOne('/api/empleados');
+    expect(envio.request.body.escalaId).toBe(11);
+    expect(envio.request.body.sueldoBase).toBe(675);
+  });
+
+  it('un cargo ya escrito no se pisa al elegir el grado', async () => {
+    const { fixture, el } = await abrir();
+    escribir(el, 'regimen', 'LOSEP', 'change');
+    escribir(el, 'cargo', 'Asistente');
+    fixture.detectChanges();
+    escribir(el, 'escalaId', '12', 'change');
+    fixture.detectChanges();
+    expect(el.querySelector<HTMLInputElement>('#cargo')!.value).toBe('Asistente');
+    expect(el.querySelector<HTMLInputElement>('#sueldoBase')!.value).toBe('817');
+  });
+
+  it('si cambia el régimen, el grado que ya no corresponde se quita', async () => {
+    const { fixture, el } = await abrir();
+    escribir(el, 'regimen', 'LOSEP', 'change');
+    fixture.detectChanges();
+    escribir(el, 'escalaId', '11', 'change');
+    fixture.detectChanges();
+
+    escribir(el, 'regimen', 'CODIGO_TRABAJO', 'change');
+    fixture.detectChanges();
+    TestBed.tick();
+    fixture.detectChanges();
+    expect(el.querySelector<HTMLSelectElement>('#escalaId')!.value).toBe('');
+  });
+
+  it('en la LOEP la escala depende de la categoría', async () => {
+    const { fixture, el } = await abrir();
+    escribir(el, 'regimen', 'LOEP', 'change');
+    fixture.detectChanges(); // aparece el selector de categoría
+    escribir(el, 'categoriaLoep', 'servidor', 'change');
+    fixture.detectChanges();
+    expect(el.querySelector('#escalaId option[value="11"]')).not.toBeNull(); // escala de la LOSEP
+
+    escribir(el, 'categoriaLoep', 'obrero', 'change');
+    fixture.detectChanges();
+    expect(el.querySelector('#escalaId option[value="13"]')).not.toBeNull(); // escala del Código
+    expect(el.querySelector('#escalaId option[value="11"]')).toBeNull();
   });
 });
