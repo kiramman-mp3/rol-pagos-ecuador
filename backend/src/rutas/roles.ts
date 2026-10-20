@@ -10,6 +10,8 @@ import {
 import type { Fila } from "../db.ts";
 import { parametrosDelAnio } from "../parametros.ts";
 import { indexarRegimenes, listarRegimenes, opcionesDe, regimenAplicado, reglasDe } from "../regimenes.ts";
+import { documentoCsv } from "../csv.ts";
+import { planillaIess } from "../iess.ts";
 import { aDecimal, ErrorApi } from "../validaciones.ts";
 
 const CAMPOS_NOVEDAD = [
@@ -128,13 +130,11 @@ const COLUMNAS_CSV = [
   "vacaciones", "aporte_patronal", "costo_empleador",
 ];
 
-// Excel abre el CSV en UTF-8 solo si empieza con esta marca.
-const BOM = String.fromCharCode(0xfeff);
-
-const celdaCsv = (valor: unknown) => {
-  const texto = String(valor ?? "");
-  return /[",\n]/.test(texto) ? `"${texto.replaceAll('"', '""')}"` : texto;
-};
+const COLUMNAS_IESS = [
+  "cedula", "nombres", "regimen", "dias_trabajados", "materia_gravada", "tasa_aporte_personal", "aporte_personal",
+  "tasa_aporte_patronal", "aporte_patronal", "total_aportes", "fondos_reserva_a_depositar_en_iess",
+  "fondos_reserva_pagados_en_rol",
+];
 
 export function rutasRoles(db: DatabaseSync): Router {
   const router = Router();
@@ -220,13 +220,35 @@ export function rutasRoles(db: DatabaseSync): Router {
 
   router.get("/:id/csv", (req, res) => {
     const { cabecera, detalle } = cargar(req.params.id);
-    const lineas = [COLUMNAS_CSV.join(",")];
-    for (const d of detalle) lineas.push(COLUMNAS_CSV.map((c) => celdaCsv(d[c])).join(","));
     const nombre = `rol_${cabecera.anio}_${String(cabecera.mes).padStart(2, "0")}.csv`;
     res
       .type("text/csv; charset=utf-8")
       .set("Content-Disposition", `attachment; filename=${nombre}`)
-      .send(`${BOM}${lineas.join("\n")}\n`);
+      .send(documentoCsv(COLUMNAS_CSV, detalle.map((d) => COLUMNAS_CSV.map((c) => d[c]))));
+  });
+
+  /** Aportes del rol por empleado, para contrastarlos con el comprobante del IESS. */
+  router.get("/:id/iess", (req, res) => {
+    const { cabecera, detalle } = cargar(req.params.id);
+    res.json(planillaIess(Number(cabecera.anio), Number(cabecera.mes), detalle));
+  });
+
+  router.get("/:id/iess.csv", (req, res) => {
+    const { cabecera, detalle } = cargar(req.params.id);
+    const p = planillaIess(Number(cabecera.anio), Number(cabecera.mes), detalle);
+    const filas: unknown[][] = p.filas.map((f) => [
+      f.cedula, f.nombres, f.regimenAplicado, f.diasTrabajados, f.materiaGravada, f.tasaPersonal,
+      f.aportePersonal, f.tasaPatronal, f.aportePatronal, f.totalAportes, f.fondosADepositar, f.fondosPagadosEnRol,
+    ]);
+    filas.push([
+      "TOTAL", "", "", "", p.totales.materiaGravada, "", p.totales.aportePersonal, "", p.totales.aportePatronal,
+      p.totales.totalAportes, p.totales.fondosADepositar, p.totales.fondosPagadosEnRol,
+    ]);
+    const nombre = `iess_${p.anio}_${String(p.mes).padStart(2, "0")}.csv`;
+    res
+      .type("text/csv; charset=utf-8")
+      .set("Content-Disposition", `attachment; filename=${nombre}`)
+      .send(documentoCsv(COLUMNAS_IESS, filas));
   });
 
   router.delete("/:id", (req, res) => {
