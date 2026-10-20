@@ -240,6 +240,7 @@ export class FormularioEmpleado {
       if (actual && !grados.some((g) => String(g.id) === actual)) {
         this.form.controls.escalaId.setValue('');
         this.form.controls.sueldoBase.setValue(null); // el sueldo venía del grado que se quitó
+        this.soltarCargoPropuesto();
       }
     });
   }
@@ -249,10 +250,23 @@ export class FormularioEmpleado {
     const grado = this.grados().find((g) => String(g.id) === valor);
     if (!grado) {
       this.form.controls.sueldoBase.setValue(null);
+      this.soltarCargoPropuesto();
       return;
     }
     this.form.controls.sueldoBase.setValue(grado.rmu);
-    if (!this.form.controls.cargo.value.trim()) this.form.controls.cargo.setValue(grado.denominacion);
+    // El cargo se reemplaza solo si está vacío o si es el que propuso el grado anterior: uno escrito a mano se respeta.
+    const cargo = this.form.controls.cargo;
+    if (!cargo.value.trim() || cargo.value === this.cargoPropuesto) cargo.setValue(grado.denominacion);
+    this.cargoPropuesto = grado.denominacion;
+  }
+
+  /** Denominación que el último grado puso en el cargo, para saber si el usuario la cambió. */
+  private cargoPropuesto = '';
+
+  /** Si el grado se quita, el cargo que él había propuesto se quita también. */
+  private soltarCargoPropuesto() {
+    if (this.form.controls.cargo.value === this.cargoPropuesto) this.form.controls.cargo.setValue('');
+    this.cargoPropuesto = '';
   }
 
   protected async guardar() {
