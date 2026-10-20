@@ -10,6 +10,9 @@ import { Avisos } from '../../core/avisos';
 import { DineroPipe } from '../../core/dinero.pipe';
 import type { DatosEmpleado, Empleado, Grado, Puesto } from '../../core/modelos';
 
+/** Familia de un nivel de la tabla: la letra con la que empieza («B» para «B2: Supervisión técnica»). */
+const familiaDeNivel = (g: Grado) => g.denominacion.trim().charAt(0).toUpperCase();
+
 /** Alta y edición: la ruta /empleados/:id/editar entrega `id`; /empleados/nuevo no. */
 @Component({
   selector: 'app-formulario-empleado',
@@ -100,12 +103,12 @@ import type { DatosEmpleado, Empleado, Grado, Puesto } from '../../core/modelos'
             </div>
           }
           @if (exigeGrado()) {
-            <div class="campo c3">
+            <div class="campo c6">
               <label for="escalaId">{{ usaPuestos() ? 'Nivel que le toca (tabla salarial)' : 'Grado de la escala salarial' }}</label>
               <select class="entrada" id="escalaId" formControlName="escalaId"
                       (change)="elegirGrado($any($event.target).value)">
                 <option value="">Elige un grado de la tabla</option>
-                @for (g of grados(); track g.id) {
+                @for (g of opcionesGrado(); track g.id) {
                   <option [value]="g.id">
                     Grado {{ g.grado }}: {{ g.denominacion }}
                     ({{ g.esMinimo ? 'mínimo ' : '' }}{{ g.rmu | dinero }}{{ g.rmuMax ? ' a ' + (g.rmuMax | dinero) : '' }})
@@ -245,6 +248,20 @@ export class FormularioEmpleado {
   protected readonly puestoElegido = computed(() =>
     this.puestosDelRegimen().find((p) => String(p.id) === this.puestoId()),
   );
+
+  /**
+   * Los grados del select. Sin puestos, todos los de la escala. Con puestos, solo los de la misma familia
+   * de niveles que la referencia del puesto elegido (si es B3: B1, B2 y B3), y ninguno mientras no haya puesto.
+   * El grado que ya tiene el empleado siempre se ofrece, para no perderlo al editar.
+   */
+  protected readonly opcionesGrado = computed(() => {
+    const todos = this.grados();
+    if (!this.usaPuestos()) return todos;
+    const referencia = this.puestoElegido()?.referencia;
+    const actual = this.gradoId();
+    const familia = referencia ? familiaDeNivel(referencia) : null;
+    return todos.filter((g) => (familia !== null && familiaDeNivel(g) === familia) || String(g.id) === actual);
+  });
 
   private readonly escala = valorSeguro(httpResource<Grado[]>(() => '/api/escala'));
   protected readonly grados = computed(() => {
