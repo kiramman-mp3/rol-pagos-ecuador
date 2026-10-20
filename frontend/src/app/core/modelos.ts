@@ -14,6 +14,12 @@ export interface Empleado {
   categoriaLoep: string | null;
   /** Grado de la escala salarial, si el sueldo sigue una escala */
   escalaId: number | null;
+  /** null = lo que diga el régimen (por defecto, se paga cada mes en el rol) */
+  pagoDecimoTercero: Modalidad | null;
+  pagoDecimoCuarto: Modalidad | null;
+  pagoFondosReserva: Modalidad | null;
+  /** null = lo que diga el régimen */
+  recibeHorasExtras: boolean | null;
   activo: boolean;
   /** Solo viene al crear o editar: avisos que no bloquean el guardado. */
   avisos?: string[];
@@ -37,6 +43,9 @@ export interface TramoIr {
   cuota: number;
   porcentaje: number;
 }
+
+/** Cómo se recibe un beneficio: no, dentro del rol cada mes, o acumulado (provisión). */
+export type Modalidad = 'no' | 'mensual' | 'acumulado';
 
 /** Reglas de un régimen laboral. Los porcentajes son fracciones (0.0945 = 9.45%). */
 export interface Regimen {
@@ -105,6 +114,10 @@ export interface ResultadoRol {
   valorHorasDescanso: number;
   valorRecargoNocturno: number;
   comisiones: number;
+  /** Base del IESS y del impuesto: sueldo, horas extras y comisiones */
+  ingresosAportables: number;
+  /** Décimos y fondos de reserva pagados dentro del rol */
+  beneficiosMensuales: number;
   totalIngresos: number;
   aporteIess: number;
   baseIrAnual: number;
@@ -114,9 +127,12 @@ export interface ResultadoRol {
   totalDescuentos: number;
   netoPagar: number;
   decimoTercero: number;
+  decimoTerceroModalidad: Modalidad;
   decimoCuarto: number;
-  vacaciones: number;
+  decimoCuartoModalidad: Modalidad;
   fondosReserva: number;
+  fondosReservaModalidad: Modalidad;
+  vacaciones: number;
   aportePatronal: number;
   totalProvisiones: number;
   costoEmpleador: number;
@@ -169,6 +185,8 @@ export interface EmpleadoDelPeriodo {
   sueldoBase: number;
   regimen: string;
   regimenAplicado: string;
+  /** false = sus horas suplementarias, extraordinarias y de descanso no se pagan */
+  recibeHorasExtras: boolean;
   novedades: Novedades;
 }
 
@@ -183,6 +201,8 @@ export interface EntradaSimulacion {
   sueldo: number;
   regimen?: string;
   categoriaLoep?: string;
+  /** Modalidad de los décimos y fondos de reserva; sin ella, la del régimen */
+  decimos?: Modalidad;
   horasSuplementarias?: number;
   horasExtraordinarias?: number;
   comisiones?: number;
