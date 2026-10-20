@@ -4,9 +4,8 @@ import type { DatabaseSync } from "node:sqlite";
 import { CONTRATOS, EMPLEADOS_DEMO } from "../config.ts";
 import { consultar, ejecutar, filaACamel, uno } from "../db.ts";
 import type { Fila } from "../db.ts";
+import { parametrosDelAnio } from "../parametros.ts";
 import { aDecimal, cedulaValida, ErrorApi, fechaIsoValida } from "../validaciones.ts";
-
-const SBU = 482;
 
 interface DatosEmpleado {
   cedula: string;
@@ -18,7 +17,9 @@ interface DatosEmpleado {
 }
 
 /** Reglas de negocio del formulario. Devuelve los datos limpios y los avisos no bloqueantes. */
-function validar(cuerpo: Record<string, unknown>): { datos: DatosEmpleado; avisos: string[] } {
+function validar(
+  db: DatabaseSync, cuerpo: Record<string, unknown>,
+): { datos: DatosEmpleado; avisos: string[] } {
   const texto = (campo: string) => String(cuerpo[campo] ?? "").trim();
   const errores: string[] = [];
   const avisos: string[] = [];
@@ -38,7 +39,13 @@ function validar(cuerpo: Record<string, unknown>): { datos: DatosEmpleado; aviso
   try {
     sueldoBase = aDecimal(cuerpo.sueldoBase).toNumber();
     if (sueldoBase <= 0) errores.push("El sueldo base debe ser mayor a cero.");
-    else if (sueldoBase < SBU) avisos.push("Aviso: el sueldo es menor al SBU 2026 ($482).");
+    else {
+      // El SBU del año en curso sale de la base, no de una constante.
+      const { parametros } = parametrosDelAnio(db, new Date().getFullYear());
+      if (sueldoBase < parametros.sbu) {
+        avisos.push(`Aviso: el sueldo es menor al SBU ${parametros.anio} ($${parametros.sbu}).`);
+      }
+    }
   } catch (error) {
     errores.push(`Sueldo base: ${(error as Error).message}.`);
   }
@@ -93,7 +100,7 @@ export function rutasEmpleados(db: DatabaseSync): Router {
   });
 
   router.post("/", (req, res) => {
-    const { datos, avisos } = validar(req.body ?? {});
+    const { datos, avisos } = validar(db, req.body ?? {});
     let id = 0;
     guardar(() => {
       const r = ejecutar(
@@ -110,7 +117,7 @@ export function rutasEmpleados(db: DatabaseSync): Router {
 
   router.put("/:id", (req, res) => {
     const actual = buscar(req.params.id);
-    const { datos, avisos } = validar(req.body ?? {});
+    const { datos, avisos } = validar(db, req.body ?? {});
     guardar(() => {
       ejecutar(
         db,

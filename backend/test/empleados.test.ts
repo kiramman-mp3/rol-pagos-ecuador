@@ -50,6 +50,20 @@ describe("API de empleados", () => {
     assert.match(r.json.avisos[0], /SBU/);
   });
 
+  it("el aviso del SBU usa el valor guardado en la base, no uno fijo", async () => {
+    const propia = await iniciar();
+    try {
+      const tabla = (await propia.get("/api/parametros?anio=2026")).json.tablaIr;
+      await propia.put("/api/parametros/2026", { sbu: 600, tablaIr: tabla });
+      const r = await propia.post("/api/empleados", { ...EMPLEADO, sueldoBase: 550 });
+      assert.match(r.json.avisos[0], /\$600/);
+      const sin = await propia.post("/api/empleados", { ...EMPLEADO, cedula: "1702345677", sueldoBase: 650 });
+      assert.deepEqual(sin.json.avisos, []);
+    } finally {
+      propia.cerrar();
+    }
+  });
+
   it("carga los datos de ejemplo una sola vez", async () => {
     const limpia = await iniciar();
     try {
