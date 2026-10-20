@@ -137,7 +137,8 @@ a:hover { color: var(--tinta); }
 .tabla { width: 100%; border-collapse: collapse; font-size: .95rem; }
 .tabla th, .tabla td { padding: .65rem .85rem; text-align: left; vertical-align: middle; border-bottom: 1px solid var(--linea-suave); }
 .tabla th.num, .tabla td.num { text-align: right; }
-.tabla thead th { font-weight: 600; font-size: .85rem; color: var(--tinta-suave); border-bottom: 2px solid var(--linea); vertical-align: bottom; }
+.tabla thead th { font-weight: 600; font-size: .85rem; line-height: 1.25; color: var(--tinta-suave); border-bottom: 2px solid var(--linea); vertical-align: bottom; white-space: normal; overflow-wrap: normal; hyphens: manual; }
+.th-corto { display: none; }
 .tabla tbody tr:hover { background: #f6f8fb; }
 .tabla tfoot td { font-weight: 700; border-top: 2px solid var(--tinta); border-bottom: 0; background: #f6f8fb; }
 .tabla .secundario { display: block; font-size: .8rem; color: var(--tinta-suave); font-weight: 400; }
@@ -297,6 +298,21 @@ details.regimen[open] > summary { border-bottom: 1px solid var(--linea-suave); }
 .boleta-neto .cifra { font: 700 2.2rem var(--display); color: var(--neto); letter-spacing: -0.02em; }
 .firmas { display: grid; grid-template-columns: 1fr 1fr; gap: 3rem; margin-top: 4.5rem; }
 .firma { border-top: 1.5px solid var(--tinta); padding-top: .4rem; text-align: center; font-size: .875rem; }
+
+/* ---- Tablas en pantallas medianas y pequeñas: encabezados cortos y celdas más compactas ---- */
+@media (max-width: 900px) {
+  .th-largo { display: none; }
+  .th-corto { display: inline; }
+  .tabla { font-size: .88rem; }
+  .tabla th, .tabla td { padding: .55rem .6rem; }
+  .tabla thead th { font-size: .78rem; }
+  .hoja-cuerpo { padding: 1rem; }
+}
+@media (max-width: 480px) {
+  .tabla { font-size: .82rem; }
+  .tabla th, .tabla td { padding: .45rem .4rem; }
+  .tabla thead th { font-size: .72rem; }
+}
 
 /* ---- Pantallas pequeñas ---- */
 @media (max-width: 720px) {

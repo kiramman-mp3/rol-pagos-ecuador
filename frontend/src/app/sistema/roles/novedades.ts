@@ -66,17 +66,17 @@ const COLUMNAS: { campo: Campo; etiqueta: string; corte?: boolean; extra?: boole
                 <thead>
                   <tr>
                     <th rowspan="2">Empleado</th>
-                    <th rowspan="2" class="num">Sueldo base</th>
+                    <th rowspan="2" class="num"><span class="th-largo">Sueldo base</span><span class="th-corto" aria-hidden="true">Sueldo</span></th>
                     <th colspan="5" class="g-ingresos t-ingresos corte">Suma al ingreso</th>
                     <th class="g-descuentos t-descuentos corte">Se descuenta</th>
                   </tr>
                   <tr>
-                    <th class="num corte">Horas suplementarias</th>
-                    <th class="num">Horas extraordinarias</th>
-                    <th class="num">Sábado, domingo o feriado</th>
-                    <th class="num">Horas nocturnas</th>
-                    <th class="num">Comisiones y bonos ($)</th>
-                    <th class="num corte">Anticipos y otros ($)</th>
+                    <th class="num corte"><span class="th-largo">Horas suplementarias</span><span class="th-corto" aria-hidden="true">H. supl.</span></th>
+                    <th class="num"><span class="th-largo">Horas extraordinarias</span><span class="th-corto" aria-hidden="true">H. extra.</span></th>
+                    <th class="num"><span class="th-largo">Sábado, domingo o feriado</span><span class="th-corto" aria-hidden="true">Feriado</span></th>
+                    <th class="num"><span class="th-largo">Horas nocturnas</span><span class="th-corto" aria-hidden="true">Noct.</span></th>
+                    <th class="num"><span class="th-largo">Comisiones y bonos ($)</span><span class="th-corto" aria-hidden="true">Comisiones</span></th>
+                    <th class="num corte"><span class="th-largo">Anticipos y otros ($)</span><span class="th-corto" aria-hidden="true">Anticipos</span></th>
                   </tr>
                 </thead>
                 <tbody>
