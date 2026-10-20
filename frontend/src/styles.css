@@ -181,6 +181,7 @@ th.c-neto { background: var(--neto-fondo); }
 .beneficios { border: 1px solid var(--linea); border-radius: var(--radio); padding: 1rem; margin: 0; min-width: 0; }
 .beneficios legend { font-weight: 600; padding: 0 .4rem; }
 .rejilla-beneficios { display: grid; grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr)); gap: 1rem; }
+.rejilla-beneficios .campo { grid-column: auto; }
 .casilla { display: flex; align-items: center; gap: .5rem; font-weight: 500; cursor: pointer; }
 .casilla input { width: 1.1rem; height: 1.1rem; accent-color: var(--marca); }
 textarea.entrada { resize: vertical; font: inherit; }

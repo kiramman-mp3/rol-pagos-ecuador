@@ -6,6 +6,7 @@
     <nav class="enlaces" aria-label="Secciones de la página">
       <a routerLink="/" fragment="como-funciona">Cómo funciona</a>
       <a routerLink="/" fragment="que-calcula">Qué calcula</a>
+      <a routerLink="/informacion">Información</a>
     </nav>
     <a class="boton boton-pequeno entrar" routerLink="/sistema">Ingresar al sistema</a>
   </div>
@@ -227,5 +228,6 @@
   <p>
     Las cifras salen de la tabla del SRI para {{ ley()?.anio ?? 2026 }} y del sueldo básico unificado de
     {{ ley()?.sbu | dinero }}. Verifícalas antes de usar el sistema en una nómina real.
+    <a routerLink="/informacion">Conoce la investigación y las fuentes</a>.
   </p>
 </footer>
