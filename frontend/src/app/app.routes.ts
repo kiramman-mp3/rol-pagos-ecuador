@@ -29,6 +29,11 @@ export const routes: Routes = [
           import('./sistema/empleados/formulario').then((m) => m.FormularioEmpleado),
       },
       {
+        path: 'parametros',
+        title: 'Parámetros | Rol de pagos',
+        loadComponent: () => import('./sistema/parametros/parametros').then((m) => m.PaginaParametros),
+      },
+      {
         path: 'roles',
         title: 'Roles de pago | Rol de pagos',
         loadComponent: () => import('./sistema/roles/lista').then((m) => m.ListaRoles),
