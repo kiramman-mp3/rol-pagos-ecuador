@@ -2,7 +2,7 @@ import { Router } from "express";
 import type { DatabaseSync } from "node:sqlite";
 import { Decimal } from "decimal.js";
 
-import { calcularRol } from "../calculos.ts";
+import { avisosDeTopes, calcularRol } from "../calculos.ts";
 import type { ResultadoRol } from "../calculos.ts";
 import {
   aSnake, consultar, ejecutar, filaACamel, transaccion, uno,
@@ -13,9 +13,11 @@ import { reglasDe } from "../reglas.ts";
 import { aDecimal, ErrorApi } from "../validaciones.ts";
 
 const CAMPOS_NOVEDAD = [
-  "horas50", "horas100", "horasNocturnas", "comisiones", "otrosDescuentos",
+  "horasSuplementarias", "horasExtraordinarias", "horasDescanso", "horasNocturnas",
+  "comisiones", "otrosDescuentos",
 ] as const;
 type Novedad = Record<(typeof CAMPOS_NOVEDAD)[number], Decimal>;
+const COLUMNAS_NOVEDAD = CAMPOS_NOVEDAD.map(aSnake);
 
 function leerPeriodo(anioTexto: unknown, mesTexto: unknown): { anio: number; mes: number } {
   const anio = Number(anioTexto);
@@ -42,17 +44,19 @@ const existeRol = (db: DatabaseSync, anio: number, mes: number) =>
 function guardarRol(
   db: DatabaseSync, anio: number, mes: number,
   empleados: Fila[], novedades: Map<number, Novedad>,
-): number {
+): { rolId: number; avisos: string[] } {
   const cero = new Decimal(0);
-  const reglas = reglasDe(parametrosDelAnio(db, anio).parametros);
+  const { parametros, exacto } = parametrosDelAnio(db, anio);
+  const reglas = reglasDe(parametros);
   const calculos = empleados.map((e) => {
     const n = novedades.get(Number(e.id));
     const resultado = calcularRol({
       sueldoBase: String(e.sueldo_base),
       fechaIngreso: String(e.fecha_ingreso),
       anio, mes,
-      horas50: n?.horas50 ?? cero,
-      horas100: n?.horas100 ?? cero,
+      horasSuplementarias: n?.horasSuplementarias ?? cero,
+      horasExtraordinarias: n?.horasExtraordinarias ?? cero,
+      horasDescanso: n?.horasDescanso ?? cero,
       horasNocturnas: n?.horasNocturnas ?? cero,
       comisiones: n?.comisiones ?? cero,
       otrosDescuentos: n?.otrosDescuentos ?? cero,
@@ -60,12 +64,17 @@ function guardarRol(
     return { e, resultado, n };
   });
 
+  const avisos = calculos.flatMap(({ e, n }) =>
+    n ? avisosDeTopes(String(e.nombres), n, reglas) : [],
+  );
+  if (!exacto) avisos.unshift(`No hay parámetros de ${anio}; se usaron los de ${parametros.anio}.`);
+
   const total = (campo: keyof ResultadoRol) =>
     calculos.reduce((suma, c) => suma.plus(c.resultado[campo]), cero).toNumber();
 
-  return transaccion(db, () => {
+  const rolId = transaccion(db, () => {
     ejecutar(db, "DELETE FROM roles_cabecera WHERE anio = ? AND mes = ?", anio, mes);
-    const rolId = Number(
+    const nuevoId = Number(
       ejecutar(
         db,
         `INSERT INTO roles_cabecera (anio, mes, generado_en, num_empleados, total_ingresos,
@@ -79,7 +88,7 @@ function guardarRol(
 
     for (const { e, resultado, n } of calculos) {
       const fila: Fila = {
-        rol_id: rolId, empleado_id: Number(e.id), cedula: e.cedula, nombres: e.nombres,
+        rol_id: nuevoId, empleado_id: Number(e.id), cedula: e.cedula, nombres: e.nombres,
         cargo: e.cargo, sueldo_base: e.sueldo_base, fecha_ingreso: e.fecha_ingreso,
         ...Object.fromEntries(Object.entries(resultado).map(([k, v]) => [aSnake(k), v])),
       };
@@ -92,19 +101,20 @@ function guardarRol(
       );
       ejecutar(
         db,
-        `INSERT OR REPLACE INTO novedades (empleado_id, anio, mes, horas_50, horas_100,
-         horas_nocturnas, comisiones, otros_descuentos) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+        `INSERT OR REPLACE INTO novedades (empleado_id, anio, mes, ${COLUMNAS_NOVEDAD.join(", ")})
+         VALUES (?, ?, ?, ${COLUMNAS_NOVEDAD.map(() => "?").join(", ")})`,
         Number(e.id), anio, mes,
         ...CAMPOS_NOVEDAD.map((campo) => (n?.[campo] ?? cero).toNumber()),
       );
     }
-    return rolId;
+    return nuevoId;
   });
+  return { rolId, avisos };
 }
 
 const COLUMNAS_CSV = [
-  "cedula", "nombres", "cargo", "sueldo", "valor_horas_50", "valor_horas_100",
-  "valor_recargo_nocturno", "comisiones", "total_ingresos", "aporte_iess", "impuesto_renta",
+  "cedula", "nombres", "cargo", "sueldo", "valor_horas_suplementarias",
+  "valor_horas_extraordinarias", "valor_horas_descanso", "valor_recargo_nocturno", "comisiones", "total_ingresos", "aporte_iess", "impuesto_renta",
   "otros_descuentos", "total_descuentos", "neto_pagar", "decimo_tercero", "decimo_cuarto",
   "vacaciones", "fondos_reserva", "aporte_patronal", "costo_empleador",
 ];
@@ -150,8 +160,9 @@ export function rutasRoles(db: DatabaseSync): Router {
         return {
           id: e.id, nombres: e.nombres, cargo: e.cargo, sueldoBase: e.sueldo_base,
           novedades: {
-            horas50: g?.horas_50 ?? 0,
-            horas100: g?.horas_100 ?? 0,
+            horasSuplementarias: g?.horas_suplementarias ?? 0,
+            horasExtraordinarias: g?.horas_extraordinarias ?? 0,
+            horasDescanso: g?.horas_descanso ?? 0,
             horasNocturnas: g?.horas_nocturnas ?? 0,
             comisiones: g?.comisiones ?? 0,
             otrosDescuentos: g?.otros_descuentos ?? 0,
@@ -183,8 +194,8 @@ export function rutasRoles(db: DatabaseSync): Router {
     }
     if (errores.length) throw new ErrorApi(400, errores);
 
-    const id = guardarRol(db, anio, mes, empleados, novedades);
-    res.status(201).json({ id, empleados: empleados.length });
+    const { rolId, avisos } = guardarRol(db, anio, mes, empleados, novedades);
+    res.status(201).json({ id: rolId, empleados: empleados.length, avisos });
   });
 
   router.get("/:id", (req, res) => {

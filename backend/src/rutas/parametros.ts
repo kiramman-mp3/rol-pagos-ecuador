@@ -71,14 +71,14 @@ export function rutasParametros(db: DatabaseSync): Router {
       }
     };
     const sueldoBase = campo("sueldo", 1, 100000, "Sueldo");
-    const horas50 = campo("horas50", 0, 100, "Horas suplementarias");
-    const horas100 = campo("horas100", 0, 100, "Horas extraordinarias");
+    const horasSuplementarias = campo("horasSuplementarias", 0, 100, "Horas suplementarias");
+    const horasExtraordinarias = campo("horasExtraordinarias", 0, 100, "Horas extraordinarias");
     const comisiones = campo("comisiones", 0, 100000, "Comisiones");
     if (errores.length) throw new ErrorApi(400, errores);
 
     res.json(
       calcularRol({
-        sueldoBase, horas50, horas100, comisiones,
+        sueldoBase, horasSuplementarias, horasExtraordinarias, comisiones,
         fechaIngreso: "2020-01-01", anio: 2026, mes: 10,
       }, reglasDe(parametrosDelAnio(db, 2026).parametros)),
     );

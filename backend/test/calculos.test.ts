@@ -7,6 +7,7 @@ import {
   impuestoRentaAnual,
   mesesDeServicio,
   REGLAS_CT_2026,
+  avisosDeTopes,
 } from "../src/calculos.ts";
 
 const ANTIGUO = "2020-01-15";
@@ -59,10 +60,10 @@ describe("calcularRol", () => {
     // valor hora = 960 / 240 = 4.00
     const r = calcularRol({
       sueldoBase: 960, fechaIngreso: ANTIGUO, anio: 2026, mes: 10,
-      horas50: 10, horas100: 5, horasNocturnas: 20, comisiones: 100,
+      horasSuplementarias: 10, horasDescanso: 5, horasNocturnas: 20, comisiones: 100,
     });
-    assert.equal(r.valorHoras50, 60); // 10 * 4 * 1.5
-    assert.equal(r.valorHoras100, 40); // 5 * 4 * 2
+    assert.equal(r.valorHorasSuplementarias, 60); // 10 * 4 * 1.5
+    assert.equal(r.valorHorasDescanso, 40); // 5 * 4 * 2
     assert.equal(r.valorRecargoNocturno, 20); // 20 * 4 * 0.25
     assert.equal(r.totalIngresos, 1180);
     assert.equal(r.aporteIess, 111.51); // 1180 * 9.45%, redondeado
@@ -70,9 +71,9 @@ describe("calcularRol", () => {
 
   it("un empate exacto de centavos sube (16273.2 / 240 = 67.805)", () => {
     const r = calcularRol({
-      sueldoBase: 955, fechaIngreso: ANTIGUO, anio: 2026, mes: 10, horas50: "11.36",
+      sueldoBase: 955, fechaIngreso: ANTIGUO, anio: 2026, mes: 10, horasSuplementarias: "11.36",
     });
-    assert.equal(r.valorHoras50, 67.81);
+    assert.equal(r.valorHorasSuplementarias, 67.81);
   });
 
   it("otros descuentos reducen el neto", () => {
@@ -117,11 +118,32 @@ describe("reglas inyectadas", () => {
   it("los recargos de las reglas definen el valor de las horas", () => {
     // valor hora = 960 / 240 = 4.00; suplementarias al 25% y descanso al 60%
     const r = calcularRol(
-      { sueldoBase: 960, fechaIngreso: ANTIGUO, anio: 2026, mes: 10, horas50: 10, horas100: 5 },
+      { sueldoBase: 960, fechaIngreso: ANTIGUO, anio: 2026, mes: 10, horasSuplementarias: 10, horasDescanso: 5 },
       { ...REGLAS_CT_2026, recargoSuplementarias: "0.25", recargoDescanso: "0.6" },
     );
-    assert.equal(r.valorHoras50, 50); // 10 * 4 * 1.25
-    assert.equal(r.valorHoras100, 32); // 5 * 4 * 1.6
+    assert.equal(r.valorHorasSuplementarias, 50); // 10 * 4 * 1.25
+    assert.equal(r.valorHorasDescanso, 32); // 5 * 4 * 1.6
+  });
+
+  it("las horas extraordinarias tienen su propio recargo", () => {
+    // valor hora = 960 / 240 = 4.00; extraordinarias al 60% (LOSEP)
+    const r = calcularRol(
+      { sueldoBase: 960, fechaIngreso: ANTIGUO, anio: 2026, mes: 10, horasExtraordinarias: 10 },
+      { ...REGLAS_CT_2026, recargoExtraordinarias: "0.6" },
+    );
+    assert.equal(r.valorHorasExtraordinarias, 64); // 10 * 4 * 1.6
+    assert.equal(r.totalIngresos, 1024);
+    // En el Código del Trabajo son al 100%.
+    const ct = calcularRol({ sueldoBase: 960, fechaIngreso: ANTIGUO, anio: 2026, mes: 10, horasExtraordinarias: 10 });
+    assert.equal(ct.valorHorasExtraordinarias, 80);
+  });
+
+  it("los tres tipos de horas se suman al ingreso", () => {
+    const r = calcularRol({
+      sueldoBase: 960, fechaIngreso: ANTIGUO, anio: 2026, mes: 10,
+      horasSuplementarias: 10, horasExtraordinarias: 5, horasDescanso: 5, horasNocturnas: 20,
+    });
+    assert.equal(r.totalIngresos, 960 + 60 + 40 + 40 + 20);
   });
 
   it("la tabla del IR de las reglas define el impuesto", () => {
@@ -137,6 +159,28 @@ describe("reglas inyectadas", () => {
     const entrada = { ...base, fechaIngreso: "2026-04-01" }; // 6 meses de servicio
     assert.equal(calcularRol(entrada).fondosReserva, 0);
     assert.equal(calcularRol(entrada, { ...REGLAS_CT_2026, mesesParaFondos: 6 }).fondosReserva, 166.6);
+  });
+});
+
+describe("avisosDeTopes", () => {
+  const reglas = { ...REGLAS_CT_2026, topeSuplementariasMes: 60, topeExtraordinariasMes: 60 };
+
+  it("no avisa si las horas están dentro del tope", () => {
+    assert.deepEqual(
+      avisosDeTopes("Ana", { horasSuplementarias: 60, horasExtraordinarias: 10 }, reglas), [],
+    );
+  });
+
+  it("avisa cada tipo que pasa el tope", () => {
+    const avisos = avisosDeTopes("Ana", { horasSuplementarias: 61, horasExtraordinarias: 80 }, reglas);
+    assert.equal(avisos.length, 2);
+    assert.match(avisos[0], /Ana.*suplementarias.*60/);
+    assert.match(avisos[1], /extraordinarias/);
+  });
+
+  it("un tope nulo significa sin tope mensual", () => {
+    const sinTope = { ...reglas, topeExtraordinariasMes: null };
+    assert.deepEqual(avisosDeTopes("Ana", { horasSuplementarias: 0, horasExtraordinarias: 500 }, sinTope), []);
   });
 });
 

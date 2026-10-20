@@ -49,10 +49,16 @@ export interface ReglasRol {
   horasMes: number;
   /** recargo de las horas suplementarias sobre la hora normal (0.5 = +50%) */
   recargoSuplementarias: Monto;
+  /** recargo de las horas extraordinarias: de 24h00 a 06h00 en días hábiles */
+  recargoExtraordinarias: Monto;
   /** recargo de las horas en días de descanso: sábados, domingos y feriados */
   recargoDescanso: Monto;
   /** recargo del trabajo nocturno: solo el recargo, la hora base ya está en el sueldo */
   recargoNocturno: Monto;
+  /** tope mensual de horas suplementarias; null = sin tope mensual */
+  topeSuplementariasMes?: number | null;
+  /** tope mensual de horas extraordinarias; null = sin tope mensual */
+  topeExtraordinariasMes?: number | null;
   tablaIr: readonly TramoIR[];
 }
 
@@ -83,8 +89,12 @@ export const REGLAS_CT_2026: ReglasRol = {
   mesesParaFondos: 12,
   horasMes: 240,
   recargoSuplementarias: "0.5",
+  recargoExtraordinarias: 1,
   recargoDescanso: 1,
   recargoNocturno: "0.25",
+  // El Código limita por día (4) y por semana (12); 12 x 4 semanas es la referencia mensual.
+  topeSuplementariasMes: 48,
+  topeExtraordinariasMes: null,
   tablaIr: TABLA_IR_2026,
 };
 
@@ -145,8 +155,9 @@ export interface EntradaRol {
   fechaIngreso: string;
   anio: number;
   mes: number;
-  horas50?: Monto;
-  horas100?: Monto;
+  horasSuplementarias?: Monto;
+  horasExtraordinarias?: Monto;
+  horasDescanso?: Monto;
   horasNocturnas?: Monto;
   comisiones?: Monto;
   otrosDescuentos?: Monto;
@@ -160,11 +171,13 @@ export interface ResultadoRol {
   valorHora: number;
   // ingresos
   sueldo: number;
-  horas50: number;
-  horas100: number;
+  horasSuplementarias: number;
+  horasExtraordinarias: number;
+  horasDescanso: number;
   horasNocturnas: number;
-  valorHoras50: number;
-  valorHoras100: number;
+  valorHorasSuplementarias: number;
+  valorHorasExtraordinarias: number;
+  valorHorasDescanso: number;
   valorRecargoNocturno: number;
   comisiones: number;
   totalIngresos: number;
@@ -191,8 +204,9 @@ export function calcularRol(entrada: EntradaRol, reglas: ReglasRol = REGLAS_CT_2
   const sbu = D(reglas.sbu);
   const horasMes = D(reglas.horasMes);
   const sueldoBase = D(entrada.sueldoBase);
-  const horas50 = D(entrada.horas50 ?? 0);
-  const horas100 = D(entrada.horas100 ?? 0);
+  const horasSuplementarias = D(entrada.horasSuplementarias ?? 0);
+  const horasExtraordinarias = D(entrada.horasExtraordinarias ?? 0);
+  const horasDescanso = D(entrada.horasDescanso ?? 0);
   const horasNocturnas = D(entrada.horasNocturnas ?? 0);
   const comisiones = q(entrada.comisiones ?? 0);
   const otrosDescuentos = q(entrada.otrosDescuentos ?? 0);
@@ -206,10 +220,13 @@ export function calcularRol(entrada: EntradaRol, reglas: ReglasRol = REGLAS_CT_2
   const sueldo = q(sueldoBase.times(dias).div(DIAS_MES));
   const porHora = (horas: Decimal, multiplicador: Decimal) =>
     q(horas.times(sueldoBase).times(multiplicador).div(horasMes));
-  const v50 = porHora(horas50, D(1).plus(reglas.recargoSuplementarias));
-  const v100 = porHora(horas100, D(1).plus(reglas.recargoDescanso));
+  const vSuplementarias = porHora(horasSuplementarias, D(1).plus(reglas.recargoSuplementarias));
+  const vExtraordinarias = porHora(horasExtraordinarias, D(1).plus(reglas.recargoExtraordinarias));
+  const vDescanso = porHora(horasDescanso, D(1).plus(reglas.recargoDescanso));
   const vNoc = porHora(horasNocturnas, D(reglas.recargoNocturno));
-  const totalIngresos = sueldo.plus(v50).plus(v100).plus(vNoc).plus(comisiones);
+  const totalIngresos = sueldo
+    .plus(vSuplementarias).plus(vExtraordinarias).plus(vDescanso).plus(vNoc)
+    .plus(comisiones);
 
   // Descuentos. Todo el ingreso aquí es gravado con IESS.
   const iess = q(totalIngresos.times(reglas.iessPersonal));
@@ -230,11 +247,13 @@ export function calcularRol(entrada: EntradaRol, reglas: ReglasRol = REGLAS_CT_2
     mesesServicio: meses,
     valorHora: q(valorHora).toNumber(),
     sueldo: sueldo.toNumber(),
-    horas50: horas50.toNumber(),
-    horas100: horas100.toNumber(),
+    horasSuplementarias: horasSuplementarias.toNumber(),
+    horasExtraordinarias: horasExtraordinarias.toNumber(),
+    horasDescanso: horasDescanso.toNumber(),
     horasNocturnas: horasNocturnas.toNumber(),
-    valorHoras50: v50.toNumber(),
-    valorHoras100: v100.toNumber(),
+    valorHorasSuplementarias: vSuplementarias.toNumber(),
+    valorHorasExtraordinarias: vExtraordinarias.toNumber(),
+    valorHorasDescanso: vDescanso.toNumber(),
     valorRecargoNocturno: vNoc.toNumber(),
     comisiones: comisiones.toNumber(),
     totalIngresos: totalIngresos.toNumber(),
@@ -253,4 +272,27 @@ export function calcularRol(entrada: EntradaRol, reglas: ReglasRol = REGLAS_CT_2
     totalProvisiones: provisiones.toNumber(),
     costoEmpleador: totalIngresos.plus(provisiones).toNumber(),
   };
+}
+
+/** Horas del mes que un empleado trabajó fuera de su jornada. */
+export interface HorasDelMes {
+  horasSuplementarias: Monto;
+  horasExtraordinarias: Monto;
+}
+
+/**
+ * Avisos (no bloquean el rol) cuando las horas pasan el tope mensual del régimen.
+ * La LOSEP dice que, si se obliga a laborar sobre el límite, igual se pagan; por eso
+ * se advierte pero no se rechaza.
+ */
+export function avisosDeTopes(nombre: string, horas: HorasDelMes, reglas: ReglasRol): string[] {
+  const avisos: string[] = [];
+  const revisar = (tipo: string, valor: Monto, tope: number | null | undefined) => {
+    if (tope != null && D(valor).gt(tope)) {
+      avisos.push(`${nombre}: ${valor} horas ${tipo} superan el tope mensual de ${tope}.`);
+    }
+  };
+  revisar("suplementarias", horas.horasSuplementarias, reglas.topeSuplementariasMes);
+  revisar("extraordinarias", horas.horasExtraordinarias, reglas.topeExtraordinariasMes);
+  return avisos;
 }
