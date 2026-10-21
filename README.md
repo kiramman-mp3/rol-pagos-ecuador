@@ -1,39 +1,229 @@
-# Rol de Pagos Ecuador 2026
+# 💼 Rol de Pagos Ecuador 2026
 
-Sistema de nómina para Ecuador con reglas de ley **parametrizables**: API en **Express** y aplicación en **Angular**, con una página de inicio pública, una página de información con la investigación y el sistema detrás del botón **Ingresar al sistema**.
+[![Angular](https://img.shields.io/badge/Angular-22-dd0031?style=flat-square&logo=angular&logoColor=white)](https://angular.dev/)
+[![Express](https://img.shields.io/badge/Express-5-000000?style=flat-square&logo=express&logoColor=white)](https://expressjs.com/)
+[![TypeScript](https://img.shields.io/badge/TypeScript-6-blue?style=flat-square&logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
+[![PostgreSQL](https://img.shields.io/badge/PostgreSQL-Supabase-3ecf8e?style=flat-square&logo=supabase&logoColor=white)](https://supabase.com/)
+[![Node](https://img.shields.io/badge/Node-%3E%3D%2024-339933?style=flat-square&logo=nodedotjs&logoColor=white)](https://nodejs.org/)
+[![Deploy](https://img.shields.io/badge/Deploy-Vercel-000000?style=flat-square&logo=vercel&logoColor=white)](https://vercel.com/)
+
+**Rol de Pagos Ecuador** es un sistema de nómina para Ecuador cuyas reglas de ley se **parametrizan** desde la propia aplicación: régimen laboral, salario básico, escala salarial, décimos, fondos de reserva, horas extras y aportes al IESS. Una API en **Express**, una aplicación en **Angular**, una página de inicio pública y, detrás del botón **Ingresar al sistema**, el sistema completo.
 
 Se hizo como práctica de la guía APE, que pide un rol de pagos parametrizable: escoger el régimen laboral (Código del Trabajo, LOSEP o LOEP), el salario básico, la escala salarial, si el trabajador recibe décimo tercero, décimo cuarto y horas extras, y ver si el IESS, que se hace a mano en Excel, se puede automatizar.
 
-Requiere Node 24 o superior.
+> [!TIP]
+> **¿Quieres verlo funcionando?** No necesitas instalar ninguna base de datos: con dos comandos queda corriendo en `http://localhost:3000`, con 12 empleados y nueve meses de roles de ejemplo.
+> ```bash
+> npm run instalar && npm --prefix backend run seed && npm start
+> ```
 
-## Ejecutar
+---
 
-```bash
-npm run instalar     # instala la raíz, el backend y el frontend
-npm start            # compila Angular y levanta todo en http://localhost:3000
+## 🛡️ Descripción
+
+### ¿Qué problema resuelve?
+En muchas empresas el rol de pagos se arma a mano en Excel: hay que acordarse de qué recargo lleva cada tipo de hora extra, de qué décimos se pagan cada mes y cuáles se acumulan, de la tabla del impuesto a la renta del año y de qué aportes corresponden al régimen de cada persona. Un cambio de ley obliga a revisar todas las fórmulas. **Rol de Pagos Ecuador** guarda esas reglas como datos que se editan en pantalla, así que un cambio normativo es un cambio de parámetros y no de código.
+
+### ¿Qué hace?
+Para cada mes, la persona encargada anota las novedades (horas extras, comisiones, anticipos) y el sistema:
+1. Calcula a cada empleado activo con las reglas de **su** régimen: aporte personal al IESS, impuesto a la renta, décimos, fondos de reserva y vacaciones.
+2. Entrega el neto a pagar y el costo total para la empresa (ingresos + provisiones).
+3. Genera la **boleta individual** imprimible y la descarga en **CSV** del rol y de los aportes.
+4. Arma el **cuadro de conciliación con el IESS**, para contrastarlo línea por línea con el comprobante del portal.
+
+Los roles ya generados guardan una foto de las reglas con que se calcularon: si luego se editan los parámetros, el historial no cambia.
+
+### ¿Para quién está pensado?
+Para el área de talento humano o contabilidad de una empresa pequeña o mediana, y para quien necesite estudiar cómo se compone un rol de pagos ecuatoriano: el motor de cálculo son funciones puras, con pruebas, y cada regla cita su fuente.
+
+---
+
+## 🖼️ Capturas
+
+| | |
+|:---:|:---:|
+| <img src="docs/capturas/inicio-publico.png" alt="Página de inicio con el simulador" width="420"><br><sub>Inicio público con simulador</sub> | <img src="docs/capturas/inicio-del-mes.png" alt="Inicio del mes" width="420"><br><sub>Inicio del mes en cuatro pasos</sub> |
+| <img src="docs/capturas/empleados.png" alt="Lista de empleados" width="420"><br><sub>Empleados</sub> | <img src="docs/capturas/organico-funcional.png" alt="Orgánico funcional" width="420"><br><sub>Orgánico funcional</sub> |
+| <img src="docs/capturas/parametros-regimenes.png" alt="Parámetros: regímenes laborales" width="420"><br><sub>Parámetros: regímenes laborales</sub> | <img src="docs/capturas/roles-de-pago.png" alt="Roles de pago" width="420"><br><sub>Roles de pago por mes</sub> |
+| <img src="docs/capturas/rol-detalle.png" alt="Detalle de un rol" width="420"><br><sub>Detalle del rol y conciliación con el IESS</sub> | <img src="docs/capturas/boleta.png" alt="Boleta individual" width="420"><br><sub>Boleta individual imprimible</sub> |
+
+---
+
+## ✨ Características
+
+*   **Tres regímenes laborales:** Código del Trabajo, LOSEP y LOEP. En la LOEP se indica además si el empleado es servidor u obrero, y el rol usa las reglas del régimen que le corresponde.
+*   **Todo parametrizable en pantalla:** SBU, tabla del impuesto a la renta (por año), aportes, recargos, topes, vacaciones y beneficios de cada régimen se editan en **Parámetros**, sin tocar el código.
+*   **Escala salarial y orgánico funcional:** el sueldo sale del grado elegido (exacto en la LOSEP, mínimo en el Código del Trabajo) y cada puesto del orgánico lleva su función, su responsable y su nivel de referencia.
+*   **Décimos y fondos a la medida:** por empleado, cada beneficio se paga cada mes en el rol, se acumula o no se recibe.
+*   **Horas extras por tipo:** suplementarias, extraordinarias, de sábado, domingo y feriado, y nocturnas, con el recargo y el tope de cada régimen. Los topes avisan, sin bloquear.
+*   **Dinero exacto:** todo se calcula con `decimal.js` y se redondea a centavos en cada rubro.
+*   **Conciliación con el IESS:** materia gravada, aportes personal y patronal y fondos de reserva por empleado, descargables en CSV.
+*   **Boleta y CSV:** boleta individual imprimible en una hoja y exportación del rol para Excel.
+*   **Cédula validada:** dígito verificador (módulo 10) y provincia.
+*   **Sin dependencias de CDN:** las tipografías van incluidas en el proyecto.
+
+---
+
+## 🛠️ Tecnologías Utilizadas
+
+*   **Frontend:** Angular 22 (componentes standalone, señales, sin zone.js) y TypeScript
+*   **Backend:** Express 5 y TypeScript, ejecutado directamente por Node 24 (sin paso de compilación)
+*   **Base de datos:** PostgreSQL sin ORM
+    *   `pg` contra **Supabase** en producción
+    *   `PGlite` (un Postgres dentro del proceso) en las pruebas y para trabajar en local sin instalar nada
+*   **Cálculo:** `decimal.js`
+*   **Pruebas:** `node:test` (backend, incluida la API completa) y Vitest (frontend)
+*   **Despliegue:** Vercel (frontend y backend como servicios de un mismo proyecto)
+
+---
+
+## 📐 Arquitectura
+
+El motor de cálculo no sabe nada de la base de datos: recibe las reglas ya armadas y devuelve el resultado. Las rutas leen las reglas de la base, llaman al motor y guardan el rol.
+
+```mermaid
+graph TD
+    Web["Angular 22 · frontend/"] -->|HTTP /api| App["app.ts · Express 5"]
+    App --> Rutas["rutas/ · empleados, roles, parámetros, regímenes, escala, puestos"]
+
+    Rutas --> Motor["calculos.ts · motor de cálculo (funciones puras)"]
+    Rutas --> Reglas["regimenes.ts · parametros.ts · escala.ts · puestos.ts"]
+    Rutas --> IESS["iess.ts · conciliación"]
+
+    Reglas --> DB["db.ts · consultas, transacciones y migraciones"]
+    Rutas --> DB
+    DB -->|DATABASE_URL| Supabase[("PostgreSQL · Supabase")]
+    DB -->|sin DATABASE_URL, y en pruebas| PGlite[("PGlite · en memoria o en backend/data")]
 ```
 
-Para desarrollar con recarga automática:
+---
+
+## 📂 Estructura del Proyecto
 
 ```bash
-npm run dev          # API en :3000 y Angular en http://localhost:4200
+rol-pagos-ecuador/
+├── backend/                   # API REST (Express 5, TypeScript, PostgreSQL)
+│   ├── src/
+│   │   ├── calculos.ts        # Motor de cálculo: funciones puras. Empezar a leer aquí
+│   │   ├── regimenes.ts       # Regímenes laborales, reglas por régimen y opciones por empleado
+│   │   ├── parametros.ts      # SBU y tabla del IR por año
+│   │   ├── escala.ts          # Escala salarial
+│   │   ├── puestos.ts         # Orgánico funcional
+│   │   ├── iess.ts            # Cuadro de conciliación con el IESS
+│   │   ├── demo.ts            # Empleados y roles de ejemplo (los usa el seed)
+│   │   ├── db.ts              # PostgreSQL sin ORM (pg, o PGlite) y ejecutor de migraciones
+│   │   ├── rutas/             # empleados, roles, parámetros, regímenes, escala y puestos
+│   │   ├── migraciones/       # Esquema versionado: 001 a 009 (SQL numerado)
+│   │   ├── validaciones.ts    # Cédula, números y fechas
+│   │   ├── server.ts          # Arranque local
+│   │   └── vercel.ts          # Entrada del backend en Vercel
+│   └── test/                  # node:test, incluida la API completa
+├── frontend/                  # Angular 22
+│   ├── src/app/landing/       # Página de inicio con el simulador
+│   ├── src/app/informacion/   # Acerca de, investigación y fuentes
+│   ├── src/app/sistema/       # Shell, inicio del mes, empleados, orgánico, roles y parámetros
+│   ├── src/app/core/          # Cliente de la API, avisos, pipe de dinero, modelos y fuentes
+│   └── src/styles.css         # Sistema visual global
+├── docs/capturas/             # Capturas de pantalla de este README
+├── vercel.json                # Servicios de Vercel: frontend y backend
+└── package.json               # Scripts de la raíz
 ```
 
-La base es **PostgreSQL**. Con la variable `DATABASE_URL` (`postgresql://…`, por ejemplo la de Supabase) se usa esa base; sin ella, una base PGlite (un Postgres dentro del proceso) en `backend/data/pglite`, para trabajar sin instalar nada. El esquema se crea y se actualiza solo al arrancar (ver [Migraciones](#migraciones)). Borrar `backend/data/pglite` reinicia la base local.
+---
 
-En Vercel hay que definir `DATABASE_URL` con la cadena del **pooler** de Supabase (puerto 6543): el host directo `db.<proyecto>.supabase.co` solo tiene IPv6 y Vercel no lo alcanza.
+## 📋 Requisitos del Sistema
+
+*   **Node.js:** versión `>= 24`
+*   **Gestor de paquetes:** `npm`
+*   **Base de datos (solo para producción):** un PostgreSQL, por ejemplo un proyecto de [Supabase](https://supabase.com/). Para desarrollar no hace falta nada: se usa PGlite.
+
+---
+
+## 🚀 Instalación y Configuración
+
+1.  **Clonar el repositorio:**
+    ```bash
+    git clone https://github.com/kiramman-mp3/rol-pagos-ecuador.git
+    cd rol-pagos-ecuador
+    ```
+
+2.  **Instalar dependencias** de la raíz, el backend y el frontend:
+    ```bash
+    npm run instalar
+    ```
+
+3.  **Elegir la base de datos.** La base es **PostgreSQL**:
+    *   **Sin configurar nada**, se usa una base PGlite en `backend/data/pglite`. Borrar esa carpeta reinicia la base local.
+    *   **Con Supabase u otro Postgres**, define `DATABASE_URL` con su cadena de conexión:
+        ```bash
+        export DATABASE_URL='postgresql://usuario:contraseña@host:6543/postgres'
+        ```
+        En Supabase usa la cadena del **pooler** (puerto 6543): el host directo `db.<proyecto>.supabase.co` solo tiene IPv6 y Vercel no lo alcanza. Nunca guardes la cadena en el repositorio.
+
+    El esquema se crea y se actualiza solo al arrancar (ver Migraciones, más abajo).
+
+4.  **Cargar los datos de ejemplo** (opcional): 12 empleados y los roles de enero a septiembre de 2026.
+    ```bash
+    npm --prefix backend run seed
+    ```
+
+---
+
+## 🎮 Uso y Ejecución
+
+### Modo producción local
+Compila Angular y sirve todo desde Express en `http://localhost:3000`:
+```bash
+npm start
+```
+
+### Modo desarrollo
+Recarga automática: API en `:3000` y Angular en `http://localhost:4200`, con proxy de `/api`:
+```bash
+npm run dev
+```
+
+### Scripts disponibles
 
 | Comando | Qué hace |
 |---|---|
 | `npm run instalar` | Instala dependencias de los tres proyectos |
 | `npm start` | Compila el frontend y sirve todo desde Express |
 | `npm run dev` | Backend y frontend en modo desarrollo, con proxy de `/api` |
+| `npm run build` | Compila el frontend |
 | `npm test` | Pruebas del backend (Node) y del frontend (Vitest) |
 | `npm run lint` | Tipos y ESLint de ambos proyectos |
 | `npm --prefix backend run seed` | Llena una base vacía con 12 empleados y los roles de enero a septiembre de 2026 |
 | `npm --prefix backend run seed -- --reiniciar` | Igual, pero antes borra empleados, roles y novedades de la base y empieza de cero |
 
-## Qué pide la guía y cómo se cumple
+---
+
+## ☁️ Despliegue
+
+El proyecto se despliega en **Vercel** como un solo proyecto con dos servicios (`vercel.json`): el frontend Angular y el backend Express, que atiende `/api/*`. La base es la de Supabase.
+
+```bash
+vercel env add DATABASE_URL production --sensitive   # cadena del pooler de Supabase
+vercel deploy --prod
+```
+
+---
+
+## 🧭 Recorrido
+
+1. **Página de inicio (`/`)**: explica el sistema y tiene un simulador que calcula un sueldo en vivo con el motor real. Se elige el régimen y si los décimos se pagan, se acumulan o no se reciben.
+2. **Información (`/informacion`)**: de qué trata el proyecto, lo que encontró la investigación y los enlaces de todas las fuentes.
+3. **Inicio del mes (`/sistema/inicio`)**: la primera pantalla al ingresar. Muestra en cuatro pasos (equipo, novedades, rol generado, pagos e IESS) en qué punto está el mes y ofrece el botón de lo que sigue.
+4. **Parámetros (`/sistema/parametros`)**: tres pestañas. *Año*: SBU y tabla del impuesto a la renta, con la opción de agregar un año nuevo copiando otro. *Regímenes laborales*: aportes, recargos, topes, vacaciones y beneficios de cada uno. *Escala salarial*: los grados de cada régimen.
+5. **Empleados**: alta con cédula validada (módulo 10), régimen, grado de la escala, beneficios y horas extras. Un clic carga seis empleados de ejemplo que cubren los tres regímenes.
+6. **Roles de pago**: se elige el mes en un calendario de doce meses que muestra cuál ya tiene rol y se digitan las novedades (horas suplementarias, extraordinarias, de sábado, domingo o feriado, y nocturnas; comisiones; anticipos). Quien no recibe horas extras tiene esas columnas deshabilitadas.
+7. **Generar**: el backend calcula a cada empleado activo con las reglas de su régimen y guarda una foto en `roles_detalle`. Avisa, sin bloquear, si alguien pasa el tope mensual de horas.
+8. **Rol**: dos ecuaciones (`ingresos − descuentos = neto` e `ingresos + provisiones = costo empleador`), la planilla por empleado, el costo empleador aparte y la **conciliación con el IESS**.
+9. **Boleta individual** imprimible en una hoja, y **descarga en CSV** del rol y de los aportes al IESS.
+
+---
+
+## ✅ Qué pide la guía y cómo se cumple
 
 | La guía pide | Cómo lo hace el sistema | Dónde |
 |---|---|---|
@@ -46,41 +236,9 @@ En Vercel hay que definir `DATABASE_URL` con la cadena del **pooler** de Supabas
 | Si recibe horas extras | Por empleado y por régimen, con el recargo y el tope de cada uno | Empleados y novedades |
 | IESS, manual en Excel: ver si se automatiza | El aporte personal y el patronal se calculan solos; además se entrega un cuadro de conciliación con el comprobante del IESS | Detalle del rol |
 
-## Recorrido
+---
 
-1. **Página de inicio (`/`)**: explica el sistema y tiene un simulador que calcula un sueldo en vivo con el motor real. Se elige el régimen y si los décimos se pagan, se acumulan o no se reciben.
-2. **Información (`/informacion`)**: de qué trata el proyecto, lo que encontró la investigación y los enlaces de todas las fuentes.
-3. **Inicio del mes (`/sistema/inicio`)**: la primera pantalla al ingresar. Muestra en cuatro pasos (equipo, novedades, rol generado, pagos e IESS) en qué punto está el mes y ofrece el botón de lo que sigue.
-4. **Parámetros (`/sistema/parametros`)**: tres pestañas. *Año*: SBU y tabla del impuesto a la renta, con la opción de agregar un año nuevo copiando otro. *Regímenes laborales*: aportes, recargos, topes, vacaciones y beneficios de cada uno. *Escala salarial*: los grados de cada régimen.
-5. **Empleados**: alta con cédula validada (módulo 10), régimen, grado de la escala, beneficios y horas extras. Un clic carga seis empleados de ejemplo que cubren los tres regímenes.
-6. **Roles de pago**: se elige el mes en un calendario de doce meses que muestra cuál ya tiene rol y se digitan las novedades (horas suplementarias, extraordinarias, de sábado, domingo o feriado, y nocturnas; comisiones; anticipos). Quien no recibe horas extras tiene esas columnas deshabilitadas.
-7. **Generar**: el backend calcula a cada empleado activo con las reglas de su régimen y guarda una foto en `roles_detalle`. Avisa, sin bloquear, si alguien pasa el tope mensual de horas.
-8. **Rol**: dos ecuaciones (`ingresos − descuentos = neto` e `ingresos + provisiones = costo empleador`), la planilla por empleado, el costo empleador aparte y la **conciliación con el IESS**.
-9. **Boleta individual** imprimible en una hoja, y **descarga en CSV** del rol y de los aportes al IESS.
-
-## Estructura
-
-```
-backend/                  API REST (Express 5, TypeScript, PostgreSQL)
-  src/calculos.ts         Motor de cálculo: funciones puras. Empezar a leer aquí.
-  src/regimenes.ts        Regímenes laborales, reglas por régimen y opciones por empleado
-  src/parametros.ts       SBU y tabla del IR por año
-  src/escala.ts           Escala salarial
-  src/iess.ts             Cuadro de conciliación con el IESS
-  src/rutas/              empleados, roles, parámetros, regímenes y escala
-  src/migraciones/        Esquema versionado: 001 a 006 (SQL numerado)
-  src/db.ts               PostgreSQL sin ORM (pg, o PGlite en pruebas y en local) y ejecutor de migraciones
-  src/validaciones.ts     Cédula, números y fechas
-  test/                   node:test, incluida la API completa
-frontend/                 Angular 22 (componentes standalone, señales, sin zone.js)
-  src/app/landing/        Página de inicio con el simulador
-  src/app/informacion/    Página de información: acerca de, investigación y fuentes
-  src/app/sistema/        Shell, empleados, roles y parámetros
-  src/app/core/           Cliente de la API, avisos, pipe de dinero, modelos y fuentes
-  src/styles.css          Sistema visual global
-```
-
-### API
+## 🔌 API
 
 | Método y ruta | Uso |
 |---|---|
@@ -91,6 +249,8 @@ frontend/                 Angular 22 (componentes standalone, señales, sin zone
 | `PUT /api/regimenes/:codigo` | Edita las reglas de un régimen |
 | `GET /api/escala?regimen=` | Grados de la escala salarial |
 | `POST /api/escala`, `PUT/DELETE /api/escala/:id` | Alta, edición y baja de un grado |
+| `GET/POST /api/puestos`, `GET/PUT/DELETE /api/puestos/:id` | Puestos del orgánico funcional |
+| `PATCH /api/puestos/:id/responsable` | Asigna o quita al responsable de un puesto |
 | `GET/POST /api/empleados` | Lista y alta |
 | `GET/PUT/DELETE /api/empleados/:id` | Consulta, edición y baja |
 | `PATCH /api/empleados/:id/estado` | Activa o desactiva |
@@ -105,7 +265,9 @@ frontend/                 Angular 22 (componentes standalone, señales, sin zone
 
 Los errores de validación responden `400` con `{ "errores": [...] }`; una cédula o un grado repetidos responden `409`.
 
-## Reglas de cálculo
+---
+
+## 🧮 Reglas de Cálculo
 
 Todo lo que fija la ley está en la base de datos y se edita desde **Parámetros**: lo que cambia cada año (SBU y tabla del IR) y lo que cambia con el régimen (aportes, recargos, topes, vacaciones y beneficios). Los valores iniciales son estos.
 
@@ -171,7 +333,9 @@ El seed carga 12 empleados con la estructura del orgánico: Johan Gabriel Rodrí
 
 El IESS no recibe un archivo de aportes: arma la planilla en su portal a partir de los avisos de entrada y salida y las novedades que declara el empleador, y el comprobante se puede descargar en Excel. Lo que sí se automatiza es el cálculo, y por eso cada rol trae un cuadro con la materia gravada y los aportes personal y patronal de cada empleado, más los fondos de reserva que se depositan en el IESS (los que el trabajador acumula) y los que ya se pagaron en el rol. Se descarga en CSV y sirve para contrastar, línea por línea, con el comprobante del portal. La materia gravada no incluye los décimos ni los fondos pagados en el rol.
 
-## Migraciones
+---
+
+## 🗄️ Migraciones
 
 El esquema vive en `backend/src/migraciones/NNN_nombre.sql`. Las aplicadas quedan en la tabla `esquema_migraciones`, así que abrir la misma base dos veces no repite nada; cada una corre en una transacción con un candado, para que dos instancias que arrancan a la vez no la apliquen dos veces. Para cambiar el esquema se agrega el siguiente archivo numerado; no se edita uno ya aplicado.
 
@@ -183,25 +347,23 @@ El esquema vive en `backend/src/migraciones/NNN_nombre.sql`. Las aplicadas queda
 | 004 | Regímenes laborales |
 | 005 | Escala salarial |
 | 006 | Opciones por empleado y modalidad de cada beneficio en el rol |
+| 007 | Escala salarial del sector privado (niveles con sueldo mínimo) |
+| 008 | Orgánico funcional: puestos y su nivel de referencia |
+| 009 | Responsable de cada puesto |
 
 Los roles ya generados guardan una foto del régimen, de las tasas y de la modalidad con que se calcularon: si luego se editan las reglas, el historial no cambia.
 
-### Simplificaciones declaradas
+---
 
-- Sin autenticación: el botón de la landing entra directo al sistema.
-- Sin gastos personales deducibles ni rebajas del impuesto a la renta.
-- Sin préstamos del IESS, vacaciones gozadas ni liquidaciones por salida.
-- Una sola empresa; su nombre y RUC están en `backend/src/config.ts`.
-- Los topes de horas extras avisan pero no bloquean: la LOSEP dice que si se obliga a trabajar sobre el límite, igual se pagan.
-- Los puestos del nivel jerárquico superior de la LOSEP no cobran horas extras: se marca «No las recibe» en ese empleado. No se incluye la escala oficial de ese nivel.
-
-## Diseño
+## 🎨 Diseño
 
 Cuatro colores con significado fijo en toda la app: azul para ingresos, ladrillo para descuentos, verde para el neto y ámbar para provisiones. La landing, el rol y las boletas los repiten, así que el recorrido se lee igual en cada pantalla. Lo que está por confirmar se marca en ámbar.
 
 Las tipografías (Bricolage Grotesque y Figtree) van incluidas en `frontend/public/fonts`; la aplicación funciona sin internet.
 
-## Lo que queda por confirmar
+---
+
+## ⚠️ Lo que Queda por Confirmar
 
 | Dato | Por qué | Qué hace el sistema |
 |---|---|---|
@@ -213,11 +375,54 @@ Las tipografías (Bricolage Grotesque y Figtree) van incluidas en `frontend/publ
 
 Verifica todas las cifras con la norma y con el IESS antes de usar el sistema en una nómina real.
 
-## Fuentes
+### Simplificaciones declaradas
+
+- Sin autenticación: el botón de la landing entra directo al sistema.
+- Sin gastos personales deducibles ni rebajas del impuesto a la renta.
+- Sin préstamos del IESS, vacaciones gozadas ni liquidaciones por salida.
+- Una sola empresa; su nombre y RUC están en `backend/src/config.ts`.
+- Los topes de horas extras avisan pero no bloquean: la LOSEP dice que si se obliga a trabajar sobre el límite, igual se pagan.
+- Los puestos del nivel jerárquico superior de la LOSEP no cobran horas extras: se marca «No las recibe» en ese empleado. No se incluye la escala oficial de ese nivel.
+
+---
+
+## 🗺️ Roadmap de Funcionalidades
+
+- [x] Motor de cálculo con funciones puras y aritmética decimal exacta.
+- [x] Tres regímenes laborales con reglas editables en pantalla (Código del Trabajo, LOSEP y LOEP).
+- [x] SBU y tabla del impuesto a la renta por año.
+- [x] Escala salarial por régimen y orgánico funcional con responsable por puesto.
+- [x] Décimos y fondos de reserva: no, mensual o acumulado, por empleado.
+- [x] Horas extras por tipo, con recargo y tope por régimen.
+- [x] Conciliación con el IESS, boleta imprimible y CSV.
+- [x] Migraciones versionadas y base PostgreSQL en Supabase.
+- [x] Despliegue en Vercel.
+- [ ] Autenticación y roles de usuario.
+- [ ] Gastos personales deducibles y rebajas del impuesto a la renta.
+- [ ] Préstamos del IESS, vacaciones gozadas y liquidaciones por salida.
+- [ ] Varias empresas en una misma instalación.
+- [ ] Confirmar con las normas vigentes los datos marcados «por confirmar».
+
+---
+
+## 👥 Contribuidores
+
+Lista de contribuidores que han aportado commits al desarrollo de este repositorio:
+
+| Nombre | Commits |
+| :--- | :--- |
+| **kiramman-mp3** | 151 |
+
+---
+
+## 📚 Fuentes
 
 Esta lista es la misma que muestra la página de información del sistema (`/informacion`) y sale de `frontend/src/app/core/fuentes.ts`. Son 47 enlaces. Las 7 marcadas como **leída** se abrieron y se leyeron; de las demás solo se tomó el dato que indica cada una, a partir de los resultados de una búsqueda. Los textos legales pesan más que los blogs: cuando discrepan, mandan las normas.
 
-### Normas leídas en su texto
+<details>
+<summary><b>Ver las fuentes por tema</b></summary>
+
+#### Normas leídas en su texto
 
 La base de las reglas de cada régimen. Son las fuentes de mayor peso.
 
@@ -225,7 +430,7 @@ La base de las reglas de cada régimen. Son las fuentes de mayor peso.
 - [Código del Trabajo, versión del 12 de marzo de 2026 (Legalcloud)](https://legalcloud.ec/wp-content/uploads/2026/04/Codigo-del-Trabajo-CT-12-03-2026-Normativa-Ecuatoriana.pdf) **(leída)**: Arts. 47, 49, 55, 69, 71, 111 a 114 y 196: jornada, recargos, vacaciones, décimos mensuales por defecto y fondos de reserva.
 - [Ley Orgánica de Empresas Públicas (LOEP), copia del Ministerio de Telecomunicaciones](https://www.telecomunicaciones.gob.ec/wp-content/uploads/2017/05/LEY-ORGANICA-DE-EMPRESAS-PUBLICAS.pdf) **(leída)**: Arts. 17, 18 y 19: servidores de libre designación, servidores de carrera y obreros; el Directorio fija vacaciones y remuneraciones.
 
-### Páginas oficiales
+#### Páginas oficiales
 
 Del IESS y del Ministerio del Trabajo.
 
@@ -233,7 +438,7 @@ Del IESS y del Ministerio del Trabajo.
 - [Ministerio del Trabajo: Acuerdo MDT-2024-039](https://trabajo.gob.ec/wp-content/uploads/2024/04/AM-MDT-2024-039.pdf): Escala oficial del nivel jerárquico superior: 10 grados, de $2.115 a $5.072. Se vio en los resultados de búsqueda; el sistema no la carga.
 - [Ministerio del Trabajo: Código del Trabajo (PDF)](https://www.trabajo.gob.ec/wp-content/uploads/downloads/2024/01/CODIGO_DEL_TRABAJO.pdf): Confirmación del art. 49 (jornada nocturna, de 19h00 a 06h00, con 25 % de recargo).
 
-### Sueldo básico unificado 2026 ($482)
+#### Sueldo básico unificado 2026 ($482)
 
 Fijado por el Acuerdo Ministerial MDT-2025-195. Todas son secundarias; no se leyó el acuerdo.
 
@@ -244,7 +449,7 @@ Fijado por el Acuerdo Ministerial MDT-2025-195. Todas son secundarias; no se ley
 - [Cámara de la Construcción de Quito: Boletín Jurídico de enero de 2026](https://ccq.ec/wp-content/uploads/2026/04/Boletin-Juridico-Enero-2026.pdf): Fijación del SBU del trabajador en general.
 - [Xinhua: Ecuador fija en 482 dólares el salario mínimo mensual para 2026](http://spanish.xinhuanet.com/20251216/239f5b62ef6c433992ed771faf363c9a/c.html): Confirmación del monto.
 
-### Tabla del impuesto a la renta 2026
+#### Tabla del impuesto a la renta 2026
 
 Fracción básica desgravada de $12.208 y diez tramos, del 0 % al 37 %. Resolución NAC-DGERCGC25-00000043 del SRI (Andersen la cita como NAC-DGERCGC25-43).
 
@@ -257,7 +462,7 @@ Fracción básica desgravada de $12.208 y diez tramos, del 0 % al 37 %. Resoluci
 - [JEZL Auditores: tabla del IR 2026 y 2025](https://www.jezl-auditores.com/index.php/tributario/101-tabla-de-impuesto-a-la-renta-ir-2026-2025-personas-naturales-ecuador): Apareció al buscar la tabla; no se abrió.
 - [Tagline: impuesto a la renta en Ecuador 2025-2026](https://tagline-soluciones.com/blog/talento-humano/impuesto-a-la-renta-ecuador/): Equivalencia mensual: no paga quien gana menos de $1.017,33 al mes.
 
-### Aporte al IESS del sector público (por confirmar)
+#### Aporte al IESS del sector público (por confirmar)
 
 Las fuentes se contradicen: unas dan 11,45 % personal y 9,15 % patronal para los servidores públicos; otras, 9,45 % y 11,15 %. Varias atribuyen el 11,45 % a la Disposición Transitoria 16 de la Ley de Seguridad Social y a la Resolución CD 501 del IESS, pero no se pudo leer ninguna de las dos. El sistema usa 11,45 % y 9,15 % para la LOSEP y lo deja editable.
 
@@ -270,7 +475,7 @@ Las fuentes se contradicen: unas dan 11,45 % personal y 9,15 % patronal para los
 - [Tagline: aporte patronal al IESS 2026](https://tagline-soluciones.com/blog/talento-humano/aportacion-iess-empleador-ecuador/): Aporte patronal general de 11,15 %.
 - [Seguridad social del IESS (presentación de la Superintendencia de Bancos)](http://www.cesantiadac.fin.ec/superintendencia-de-bancos/img/5_SEGURIDAD_SOCIAL_IESS.PDF): Cuadro con servidores del sector público: 11,45 %, 9,15 % y 20,60 %.
 
-### Horas extras en el sector público
+#### Horas extras en el sector público
 
 Contraste de los recargos y topes del art. 114 de la LOSEP.
 
@@ -279,7 +484,7 @@ Contraste de los recargos y topes del art. 114 de la LOSEP.
 - [Tagline: cálculo de horas extras en Ecuador 2026](https://tagline-soluciones.com/blog/talento-humano/calculo-de-horas-extras-ecuador/): Recargos del Código del Trabajo (50 % y 100 %).
 - [Tagline: jornada laboral en Ecuador 2026](https://tagline-soluciones.com/blog/talento-humano/jornada-laboral-ecuador/): Jornada de 8 horas diarias y 40 semanales, y recargo nocturno.
 
-### Décimos y fondos de reserva
+#### Décimos y fondos de reserva
 
 Contraste del texto de la ley con lo que se practica.
 
@@ -291,14 +496,14 @@ Contraste del texto de la ley con lo que se practica.
 - [Tagline: fondos de reserva en Ecuador 2026](https://tagline-soluciones.com/blog/talento-humano/fondos-de-reserva-ecuador/): El pago ordinario va en el rol; acumular en el IESS requiere solicitud del trabajador.
 - [Hacecuentas: sueldo neto en Ecuador 2026](https://hacecuentas.com/ec/trabajo/sueldo-neto): Los décimos no pagan el 9,45 % del IESS.
 
-### Régimen laboral de las empresas públicas
+#### Régimen laboral de las empresas públicas
 
 Análisis de la LOEP.
 
 - [Redalyc: régimen laboral de las empresas públicas ecuatorianas](https://www.redalyc.org/journal/6002/600263428008/html/): La LOEP regula a los servidores de carrera y remite a los obreros al Código del Trabajo.
 - [vLex: Ley Orgánica de Empresas Públicas](https://vlex.ec/vid/ley-organica-empresas-publicas-643461625): Contraste de la clasificación del personal.
 
-### Escala salarial del sector público (por confirmar)
+#### Escala salarial del sector público (por confirmar)
 
 No se encontró la escala oficial vigente de 20 grados. La que carga el sistema viene de una fuente secundaria que dice «20 grados» pero lista 22.
 
@@ -306,7 +511,7 @@ No se encontró la escala oficial vigente de 20 grados. La que carga el sistema 
 - [Lexis: Acuerdo Ministerial 39, fijación de remuneraciones mensuales unificadas](https://www.lexis.com.ec/noticias/acuerdo-ministerial-39-fijacion-de-remuneraciones-mensuales-unificadas-de-servidores-de-entidades-del-sector-publico): Una escala de 10 grados, de fecha antigua; se descartó.
 - [Tagline: sueldos del sector público en Ecuador 2026](https://tagline-soluciones.com/salarios/sector-publico/): Mismos valores que ecu11 con otra numeración de grados.
 
-### Planilla del IESS
+#### Planilla del IESS
 
 Cómo se declaran los aportes. No se encontró un formato público de archivo para subirlos.
 
@@ -314,3 +519,10 @@ Cómo se declaran los aportes. No se encontró un formato público de archivo pa
 - [Tus Trámites Ecuador: registro masivo de novedades (carga batch)](https://tustramitesecuador.com/registro-masivo-de-novedades-para-empleadores-carga-batch/): Existe una carga batch de novedades en el portal; no se pudo confirmar su formato.
 - [Contapp: planilla del IESS en Ecuador](https://www.contapp.ec/blogs/planilla-iess-ecuador): Apareció al buscar el formato de la planilla; no se abrió.
 
+</details>
+
+---
+
+## ✍️ Autor
+
+*   **kiramman-mp3** - *Desarrollo*
