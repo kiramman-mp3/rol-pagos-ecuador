@@ -1,34 +1,34 @@
 import { Router } from "express";
-import type { DatabaseSync } from "node:sqlite";
 
 import { actualizarGrado, buscarGrado, crearGrado, eliminarGrado, listarEscala } from "../escala.ts";
+import type { Base } from "../db.ts";
 import { ErrorApi } from "../validaciones.ts";
 
-export function rutasEscala(db: DatabaseSync): Router {
+export function rutasEscala(db: Base): Router {
   const router = Router();
 
   /** Todos los grados, o solo los de un régimen con `?regimen=LOSEP`. */
-  router.get("/", (req, res) => {
+  router.get("/", async (req, res) => {
     const regimen = typeof req.query.regimen === "string" ? req.query.regimen : undefined;
-    res.json(listarEscala(db, regimen));
+    res.json(await listarEscala(db, regimen));
   });
 
-  router.get("/:id", (req, res) => {
-    const grado = buscarGrado(db, Number(req.params.id));
+  router.get("/:id", async (req, res) => {
+    const grado = await buscarGrado(db, Number(req.params.id));
     if (!grado) throw new ErrorApi(404, ["El grado no existe."]);
     res.json(grado);
   });
 
-  router.post("/", (req, res) => {
-    res.status(201).json(crearGrado(db, req.body ?? {}));
+  router.post("/", async (req, res) => {
+    res.status(201).json(await crearGrado(db, req.body ?? {}));
   });
 
-  router.put("/:id", (req, res) => {
-    res.json(actualizarGrado(db, Number(req.params.id), req.body ?? {}));
+  router.put("/:id", async (req, res) => {
+    res.json(await actualizarGrado(db, Number(req.params.id), req.body ?? {}));
   });
 
-  router.delete("/:id", (req, res) => {
-    eliminarGrado(db, Number(req.params.id));
+  router.delete("/:id", async (req, res) => {
+    await eliminarGrado(db, Number(req.params.id));
     res.status(204).end();
   });
 

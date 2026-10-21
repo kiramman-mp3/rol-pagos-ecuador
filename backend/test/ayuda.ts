@@ -1,6 +1,7 @@
 import type { AddressInfo } from "node:net";
 
 import { crearApp } from "../src/app.ts";
+import { abrirBase } from "../src/db.ts";
 
 export interface Cliente {
   get: (ruta: string) => Promise<Respuesta>;
@@ -8,7 +9,7 @@ export interface Cliente {
   put: (ruta: string, cuerpo?: unknown) => Promise<Respuesta>;
   patch: (ruta: string, cuerpo?: unknown) => Promise<Respuesta>;
   del: (ruta: string) => Promise<Respuesta>;
-  cerrar: () => void;
+  cerrar: () => Promise<void>;
 }
 
 export interface Respuesta {
@@ -19,9 +20,10 @@ export interface Respuesta {
   tipo: string;
 }
 
-/** Levanta la API en un puerto libre con una base en memoria, para una prueba. */
+/** Levanta la API en un puerto libre con una base Postgres en memoria (PGlite), para una prueba. */
 export async function iniciar(): Promise<Cliente> {
-  const { app, db } = crearApp({ rutaBase: ":memory:" });
+  const db = await abrirBase(":memory:");
+  const app = crearApp(db);
   const servidor = await new Promise<ReturnType<typeof app.listen>>((resolver) => {
     const s = app.listen(0, () => resolver(s));
   });
@@ -49,9 +51,9 @@ export async function iniciar(): Promise<Cliente> {
     put: (ruta, cuerpo = {}) => pedir("PUT", ruta, cuerpo),
     patch: (ruta, cuerpo) => pedir("PATCH", ruta, cuerpo),
     del: (ruta) => pedir("DELETE", ruta),
-    cerrar: () => {
+    cerrar: async () => {
       servidor.close();
-      db.close();
+      await db.cerrar();
     },
   };
 }

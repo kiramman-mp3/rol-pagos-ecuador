@@ -1,12 +1,11 @@
 import { Router } from "express";
-import type { DatabaseSync } from "node:sqlite";
 
 import { CONTRATOS } from "../config.ts";
 import { cargarEmpleadosDemo } from "../demo.ts";
 import { MODALIDADES } from "../calculos.ts";
 import type { Modalidad } from "../calculos.ts";
-import { consultar, ejecutar, filaACamel, uno } from "../db.ts";
-import type { Fila } from "../db.ts";
+import { consultar, ejecutar, esDuplicado, filaACamel, insertar, uno } from "../db.ts";
+import type { Base, Fila } from "../db.ts";
 import { parametrosDelAnio } from "../parametros.ts";
 import { buscarGrado, listarEscala } from "../escala.ts";
 import { buscarPuesto, listarPuestos, soltarResponsable } from "../puestos.ts";
@@ -32,9 +31,9 @@ interface DatosEmpleado {
 }
 
 /** Reglas de negocio del formulario. Devuelve los datos limpios y los avisos no bloqueantes. */
-function validar(
-  db: DatabaseSync, cuerpo: Record<string, unknown>,
-): { datos: DatosEmpleado; avisos: string[] } {
+async function validar(
+  db: Base, cuerpo: Record<string, unknown>,
+): Promise<{ datos: DatosEmpleado; avisos: string[] }> {
   const texto = (campo: string) => String(cuerpo[campo] ?? "").trim();
   const errores: string[] = [];
   const avisos: string[] = [];
@@ -52,7 +51,8 @@ function validar(
   if (!fechaIsoValida(fechaIngreso)) errores.push("Fecha de ingreso inválida.");
 
   // El régimen existe y, si es mixto (LOEP), hace falta saber si es servidor u obrero.
-  const elegido = indexarRegimenes(listarRegimenes(db)).get(regimen);
+  const regimenes = indexarRegimenes(await listarRegimenes(db));
+  const elegido = regimenes.get(regimen);
   let categoriaLoep: string | null = null;
   if (!elegido) {
     errores.push("El régimen laboral no existe.");
@@ -67,7 +67,7 @@ function validar(
   let aplicado: string | null = null;
   if (elegido) {
     try {
-      aplicado = regimenAplicado(indexarRegimenes(listarRegimenes(db)), regimen, categoriaLoep).codigo;
+      aplicado = regimenAplicado(regimenes, regimen, categoriaLoep).codigo;
     } catch {
       /* la categoría faltante ya quedó reportada arriba */
     }
@@ -76,8 +76,8 @@ function validar(
   // Puesto del orgánico: si el régimen aplicado tiene puestos, se identifica primero (función,
   // responsabilidad, sector) y de él sale el nivel de la escala que sirve de referencia al sueldo.
   let puestoId: number | null = null;
-  const puesto = vacio(cuerpo.puestoId) ? undefined : buscarPuesto(db, Number(cuerpo.puestoId));
-  const hayPuestos = aplicado !== null && listarPuestos(db).some((p) => p.referencia?.regimen === aplicado);
+  const puesto = vacio(cuerpo.puestoId) ? undefined : await buscarPuesto(db, Number(cuerpo.puestoId));
+  const hayPuestos = aplicado !== null && (await listarPuestos(db)).some((p) => p.referencia?.regimen === aplicado);
   if (!vacio(cuerpo.puestoId)) {
     if (!puesto) errores.push("El puesto no existe.");
     else if (aplicado && puesto.referencia && puesto.referencia.regimen !== aplicado) {
@@ -92,7 +92,7 @@ function validar(
   let escalaId: number | null = null;
   const pedido = vacio(cuerpo.escalaId) && puestoId !== null ? puesto?.escalaId : cuerpo.escalaId;
   const hayPedido = !vacio(pedido);
-  const grado = hayPedido ? buscarGrado(db, Number(pedido)) : undefined;
+  const grado = hayPedido ? await buscarGrado(db, Number(pedido)) : undefined;
   if (hayPedido) {
     if (!grado) errores.push("El grado de la escala salarial no existe.");
     else if (aplicado && grado.regimen !== aplicado) {
@@ -103,7 +103,7 @@ function validar(
         avisos.push(`Aviso: el nivel ${grado.denominacion} difiere de la referencia del puesto «${puesto.nombre}».`);
       }
     }
-  } else if (aplicado && listarEscala(db, aplicado).length > 0) {
+  } else if (aplicado && (await listarEscala(db, aplicado)).length > 0) {
     errores.push(`Elige un grado de la escala salarial ${aplicado}: el sueldo se toma de la tabla.`);
   }
 
@@ -132,7 +132,7 @@ function validar(
     if (sueldoBase <= 0) errores.push("El sueldo base debe ser mayor a cero.");
     else {
       // El SBU del año en curso sale de la base, no de una constante.
-      const { parametros } = parametrosDelAnio(db, new Date().getFullYear());
+      const { parametros } = await parametrosDelAnio(db, new Date().getFullYear());
       if (grado && escalaId !== null && grado.esMinimo && sueldoBase < grado.rmu) {
         errores.push(
           `No se puede registrar al empleado: el sueldo ($${sueldoBase}) es menor al mínimo del nivel ${grado.denominacion} ($${grado.rmu}).`,
@@ -166,44 +166,43 @@ const aApi = (fila: Fila) => ({
   recibeHorasExtras: fila.recibe_horas_extras === null ? null : fila.recibe_horas_extras === 1,
 });
 
-export function rutasEmpleados(db: DatabaseSync): Router {
+export function rutasEmpleados(db: Base): Router {
   const router = Router();
 
-  const buscar = (idTexto: string): Fila => {
-    const fila = uno(db, "SELECT * FROM empleados WHERE id = ?", Number(idTexto));
+  const buscar = async (idTexto: string): Promise<Fila> => {
+    const fila = await uno(db, "SELECT * FROM empleados WHERE id = ?", Number(idTexto));
     if (!fila) throw new ErrorApi(404, ["El empleado no existe."]);
     return fila;
   };
 
   /** Traduce el choque con la restricción UNIQUE de la cédula a un 409 legible. */
-  const guardar = (accion: () => void) => {
+  const guardar = async <T>(accion: () => Promise<T>): Promise<T> => {
     try {
-      accion();
+      return await accion();
     } catch (error) {
-      if (String((error as Error).message).includes("UNIQUE")) {
+      if (esDuplicado(error)) {
         throw new ErrorApi(409, ["Ya existe un empleado con esa cédula."]);
       }
       throw error;
     }
   };
 
-  router.get("/", (_req, res) => {
-    res.json(consultar(db, "SELECT * FROM empleados ORDER BY activo DESC, nombres").map(aApi));
+  router.get("/", async (_req, res) => {
+    res.json((await consultar(db, "SELECT * FROM empleados ORDER BY activo DESC, nombres")).map(aApi));
   });
 
-  router.post("/demo", (_req, res) => {
-    res.status(201).json({ agregados: cargarEmpleadosDemo(db) });
+  router.post("/demo", async (_req, res) => {
+    res.status(201).json({ agregados: await cargarEmpleadosDemo(db) });
   });
 
-  router.get("/:id", (req, res) => {
-    res.json(aApi(buscar(req.params.id)));
+  router.get("/:id", async (req, res) => {
+    res.json(aApi(await buscar(req.params.id)));
   });
 
-  router.post("/", (req, res) => {
-    const { datos, avisos } = validar(db, req.body ?? {});
-    let id = 0;
-    guardar(() => {
-      const r = ejecutar(
+  router.post("/", async (req, res) => {
+    const { datos, avisos } = await validar(db, req.body ?? {});
+    const id = await guardar(() =>
+      insertar(
         db,
         `INSERT INTO empleados (cedula, nombres, cargo, sueldo_base, fecha_ingreso, tipo_contrato,
          regimen, categoria_loep, escala_id, puesto_id, pago_decimo_tercero, pago_decimo_cuarto,
@@ -212,17 +211,16 @@ export function rutasEmpleados(db: DatabaseSync): Router {
         datos.tipoContrato, datos.regimen, datos.categoriaLoep, datos.escalaId, datos.puestoId,
         datos.pagoDecimoTercero, datos.pagoDecimoCuarto, datos.pagoFondosReserva,
         datos.recibeHorasExtras === null ? null : Number(datos.recibeHorasExtras),
-      );
-      id = Number(r.lastInsertRowid);
-    });
-    res.status(201).json({ ...aApi(buscar(String(id))), avisos });
+      ),
+    );
+    res.status(201).json({ ...aApi(await buscar(String(id))), avisos });
   });
 
-  router.put("/:id", (req, res) => {
-    const actual = buscar(req.params.id);
-    const { datos, avisos } = validar(db, req.body ?? {});
-    guardar(() => {
-      ejecutar(
+  router.put("/:id", async (req, res) => {
+    const actual = await buscar(req.params.id);
+    const { datos, avisos } = await validar(db, req.body ?? {});
+    await guardar(async () => {
+      await ejecutar(
         db,
         `UPDATE empleados SET cedula = ?, nombres = ?, cargo = ?, sueldo_base = ?,
          fecha_ingreso = ?, tipo_contrato = ?, regimen = ?, categoria_loep = ?, escala_id = ?, puesto_id = ?,
@@ -233,21 +231,21 @@ export function rutasEmpleados(db: DatabaseSync): Router {
         datos.pagoDecimoTercero, datos.pagoDecimoCuarto, datos.pagoFondosReserva,
         datos.recibeHorasExtras === null ? null : Number(datos.recibeHorasExtras), actual.id,
       );
-      soltarResponsable(db, Number(actual.id), datos.puestoId); // si cambió de puesto, ya no lo encabeza
+      await soltarResponsable(db, Number(actual.id), datos.puestoId); // si cambió de puesto, ya no lo encabeza
     });
-    res.json({ ...aApi(buscar(req.params.id)), avisos });
+    res.json({ ...aApi(await buscar(req.params.id)), avisos });
   });
 
-  router.patch("/:id/estado", (req, res) => {
-    const actual = buscar(req.params.id);
-    ejecutar(db, "UPDATE empleados SET activo = 1 - activo WHERE id = ?", actual.id);
-    if (actual.activo === 1) soltarResponsable(db, Number(actual.id), null); // quien se desactiva deja de ser responsable
-    res.json(aApi(buscar(req.params.id)));
+  router.patch("/:id/estado", async (req, res) => {
+    const actual = await buscar(req.params.id);
+    await ejecutar(db, "UPDATE empleados SET activo = 1 - activo WHERE id = ?", actual.id);
+    if (actual.activo === 1) await soltarResponsable(db, Number(actual.id), null); // quien se desactiva deja de ser responsable
+    res.json(aApi(await buscar(req.params.id)));
   });
 
-  router.delete("/:id", (req, res) => {
-    const actual = buscar(req.params.id);
-    ejecutar(db, "DELETE FROM empleados WHERE id = ?", actual.id);
+  router.delete("/:id", async (req, res) => {
+    const actual = await buscar(req.params.id);
+    await ejecutar(db, "DELETE FROM empleados WHERE id = ?", actual.id);
     res.status(204).end();
   });
 
