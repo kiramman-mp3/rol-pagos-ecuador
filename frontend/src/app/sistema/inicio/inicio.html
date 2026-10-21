@@ -1,0 +1,57 @@
+@if (fallo()) {
+  <div class="aviso aviso-danger" role="status">
+    No se pudo cargar tu información. Revisa que el servidor esté encendido y recarga la página.
+  </div>
+} @else if (cargando()) {
+  <p class="apoyo">Preparando tu mes…</p>
+} @else {
+  <section class="portada-mes" aria-labelledby="titulo-mes">
+    <div class="portada-texto">
+      <p class="saludo">{{ saludo }}, {{ parametros()?.empresa?.nombre }}</p>
+      <h1 id="titulo-mes">{{ titular() }}</h1>
+      <p class="frase">{{ frase() }}</p>
+      <a class="boton boton-sol boton-grande" [routerLink]="siguiente().enlace">{{ siguiente().accion }}</a>
+    </div>
+  </section>
+
+  <ol class="pasos-mes" aria-label="Pasos para cerrar el mes">
+    @for (p of pasos(); track p.titulo; let i = $index) {
+      <li class="paso paso-{{ p.estado }}" [attr.aria-current]="p.estado === 'actual' ? 'step' : null">
+        <span class="paso-marca" aria-hidden="true">
+          @if (p.estado === 'hecho') { ✓ } @else { {{ i + 1 }} }
+        </span>
+        <h2>{{ p.titulo }}</h2>
+        <p>{{ p.detalle }}</p>
+        <a [class]="p.estado === 'actual' ? 'boton boton-pequeno' : 'boton-texto'" [routerLink]="p.enlace">
+          {{ p.accion }}
+        </a>
+      </li>
+    }
+  </ol>
+
+  <section class="resumen-mes" aria-label="Resumen">
+    <div class="dato">
+      <span class="dato-cifra">{{ activos() }}</span>
+      <span class="dato-etiqueta">{{ activos() === 1 ? 'persona activa' : 'personas activas' }}</span>
+      @if (inactivos()) {
+        <span class="dato-nota">{{ inactivos() }} {{ inactivos() === 1 ? 'inactiva' : 'inactivas' }}, no entra{{ inactivos() === 1 ? '' : 'n' }} al rol</span>
+      }
+    </div>
+    @if (ultimoRol(); as r) {
+      <div class="dato dato-neto">
+        <span class="dato-cifra">{{ r.totalNeto | dinero }}</span>
+        <span class="dato-etiqueta">neto a pagar en {{ parametros()?.meses?.[r.mes - 1] }} {{ r.anio }}</span>
+        <a class="boton-texto" [routerLink]="['/sistema/roles', r.id]">Abrir el rol</a>
+      </div>
+      <div class="dato dato-costo">
+        <span class="dato-cifra">{{ r.totalCosto | dinero }}</span>
+        <span class="dato-etiqueta">cuesta ese rol a la empresa</span>
+        <span class="dato-nota">Incluye aporte patronal y provisiones</span>
+      </div>
+    } @else {
+      <div class="dato dato-vacio">
+        <span class="dato-etiqueta">Cuando generes tu primer rol, aquí verás cuánto se paga y cuánto cuesta.</span>
+      </div>
+    }
+  </section>
+}
