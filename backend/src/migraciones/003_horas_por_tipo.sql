@@ -7,11 +7,11 @@
 -- en el Código del Trabajo: suplementarias y de descanso.
 ALTER TABLE novedades RENAME COLUMN horas_50 TO horas_suplementarias;
 ALTER TABLE novedades RENAME COLUMN horas_100 TO horas_descanso;
-ALTER TABLE novedades ADD COLUMN horas_extraordinarias REAL NOT NULL DEFAULT 0;
+ALTER TABLE novedades ADD COLUMN horas_extraordinarias DOUBLE PRECISION NOT NULL DEFAULT 0;
 
 ALTER TABLE roles_detalle RENAME COLUMN horas_50 TO horas_suplementarias;
 ALTER TABLE roles_detalle RENAME COLUMN horas_100 TO horas_descanso;
 ALTER TABLE roles_detalle RENAME COLUMN valor_horas_50 TO valor_horas_suplementarias;
 ALTER TABLE roles_detalle RENAME COLUMN valor_horas_100 TO valor_horas_descanso;
-ALTER TABLE roles_detalle ADD COLUMN horas_extraordinarias REAL NOT NULL DEFAULT 0;
-ALTER TABLE roles_detalle ADD COLUMN valor_horas_extraordinarias REAL NOT NULL DEFAULT 0;
+ALTER TABLE roles_detalle ADD COLUMN horas_extraordinarias DOUBLE PRECISION NOT NULL DEFAULT 0;
+ALTER TABLE roles_detalle ADD COLUMN valor_horas_extraordinarias DOUBLE PRECISION NOT NULL DEFAULT 0;

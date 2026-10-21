@@ -1,13 +1,12 @@
 import { Router } from "express";
-import type { DatabaseSync } from "node:sqlite";
 import { Decimal } from "decimal.js";
 
 import { avisoHorasIgnoradas, avisosDeTopes, calcularRol } from "../calculos.ts";
 import type { ResultadoRol } from "../calculos.ts";
 import {
-  aSnake, consultar, ejecutar, filaACamel, transaccion, uno,
+  aSnake, consultar, ejecutar, filaACamel, insertar, transaccion, uno,
 } from "../db.ts";
-import type { Fila } from "../db.ts";
+import type { Base, Fila } from "../db.ts";
 import { parametrosDelAnio } from "../parametros.ts";
 import { indexarRegimenes, listarRegimenes, opcionesDe, regimenAplicado, reglasDe } from "../regimenes.ts";
 import { documentoCsv } from "../csv.ts";
@@ -31,7 +30,7 @@ function leerPeriodo(anioTexto: unknown, mesTexto: unknown): { anio: number; mes
 }
 
 /** Activos que ya habían ingresado al cierre del mes (las fechas ISO se comparan como texto). */
-export function empleadosDelPeriodo(db: DatabaseSync, anio: number, mes: number): Fila[] {
+export function empleadosDelPeriodo(db: Base, anio: number, mes: number): Promise<Fila[]> {
   return consultar(
     db,
     "SELECT * FROM empleados WHERE activo = 1 AND fecha_ingreso <= ? ORDER BY nombres",
@@ -39,17 +38,17 @@ export function empleadosDelPeriodo(db: DatabaseSync, anio: number, mes: number)
   );
 }
 
-const existeRol = (db: DatabaseSync, anio: number, mes: number) =>
-  uno(db, "SELECT 1 AS ok FROM roles_cabecera WHERE anio = ? AND mes = ?", anio, mes) !== undefined;
+const existeRol = async (db: Base, anio: number, mes: number) =>
+  (await uno(db, "SELECT 1 AS ok FROM roles_cabecera WHERE anio = ? AND mes = ?", anio, mes)) !== undefined;
 
 /** Calcula y guarda todo en una sola transacción; reemplaza el rol del mes si existía. */
-export function guardarRol(
-  db: DatabaseSync, anio: number, mes: number,
+export async function guardarRol(
+  db: Base, anio: number, mes: number,
   empleados: Fila[], novedades: Map<number, Novedad>,
-): { rolId: number; avisos: string[] } {
+): Promise<{ rolId: number; avisos: string[] }> {
   const cero = new Decimal(0);
-  const { parametros, exacto } = parametrosDelAnio(db, anio);
-  const regimenes = indexarRegimenes(listarRegimenes(db));
+  const { parametros, exacto } = await parametrosDelAnio(db, anio);
+  const regimenes = indexarRegimenes(await listarRegimenes(db));
   const calculos = empleados.map((e) => {
     const n = novedades.get(Number(e.id));
     const aplicado = regimenAplicado(regimenes, String(e.regimen), e.categoria_loep as string | null);
@@ -79,18 +78,16 @@ export function guardarRol(
   const total = (campo: keyof ResultadoRol) =>
     calculos.reduce((suma, c) => suma.plus(c.resultado[campo]), cero).toNumber();
 
-  const rolId = transaccion(db, () => {
-    ejecutar(db, "DELETE FROM roles_cabecera WHERE anio = ? AND mes = ?", anio, mes);
-    const nuevoId = Number(
-      ejecutar(
-        db,
-        `INSERT INTO roles_cabecera (anio, mes, generado_en, num_empleados, total_ingresos,
-         total_descuentos, total_neto, total_provisiones, total_costo)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-        anio, mes, new Date().toISOString().slice(0, 19), calculos.length,
-        total("totalIngresos"), total("totalDescuentos"), total("netoPagar"),
-        total("totalProvisiones"), total("costoEmpleador"),
-      ).lastInsertRowid,
+  const rolId = await transaccion(db, async (tx) => {
+    await ejecutar(tx, "DELETE FROM roles_cabecera WHERE anio = ? AND mes = ?", anio, mes);
+    const nuevoId = await insertar(
+      tx,
+      `INSERT INTO roles_cabecera (anio, mes, generado_en, num_empleados, total_ingresos,
+       total_descuentos, total_neto, total_provisiones, total_costo)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      anio, mes, new Date().toISOString().slice(0, 19), calculos.length,
+      total("totalIngresos"), total("totalDescuentos"), total("netoPagar"),
+      total("totalProvisiones"), total("costoEmpleador"),
     );
 
     for (const { e, resultado, n, aplicado } of calculos) {
@@ -102,16 +99,18 @@ export function guardarRol(
         ...Object.fromEntries(Object.entries(resultado).map(([k, v]) => [aSnake(k), v])),
       };
       const columnas = Object.keys(fila);
-      ejecutar(
-        db,
+      await ejecutar(
+        tx,
         `INSERT INTO roles_detalle (${columnas.join(", ")})
          VALUES (${columnas.map(() => "?").join(", ")})`,
         ...Object.values(fila),
       );
-      ejecutar(
-        db,
-        `INSERT OR REPLACE INTO novedades (empleado_id, anio, mes, ${COLUMNAS_NOVEDAD.join(", ")})
-         VALUES (?, ?, ?, ${COLUMNAS_NOVEDAD.map(() => "?").join(", ")})`,
+      await ejecutar(
+        tx,
+        `INSERT INTO novedades (empleado_id, anio, mes, ${COLUMNAS_NOVEDAD.join(", ")})
+         VALUES (?, ?, ?, ${COLUMNAS_NOVEDAD.map(() => "?").join(", ")})
+         ON CONFLICT (empleado_id, anio, mes) DO UPDATE SET
+         ${COLUMNAS_NOVEDAD.map((c) => `${c} = excluded.${c}`).join(", ")}`,
         Number(e.id), anio, mes,
         ...CAMPOS_NOVEDAD.map((campo) => (n?.[campo] ?? cero).toNumber()),
       );
@@ -136,36 +135,36 @@ const COLUMNAS_IESS = [
   "fondos_reserva_pagados_en_rol",
 ];
 
-export function rutasRoles(db: DatabaseSync): Router {
+export function rutasRoles(db: Base): Router {
   const router = Router();
 
-  const cargar = (idTexto: string) => {
-    const cabecera = uno(db, "SELECT * FROM roles_cabecera WHERE id = ?", Number(idTexto));
+  const cargar = async (idTexto: string) => {
+    const cabecera = await uno(db, "SELECT * FROM roles_cabecera WHERE id = ?", Number(idTexto));
     if (!cabecera) throw new ErrorApi(404, ["El rol no existe."]);
-    const detalle = consultar(
+    const detalle = await consultar(
       db, "SELECT * FROM roles_detalle WHERE rol_id = ? ORDER BY nombres", Number(cabecera.id),
     );
     return { cabecera, detalle };
   };
 
-  router.get("/", (_req, res) => {
+  router.get("/", async (_req, res) => {
     res.json(
-      consultar(db, "SELECT * FROM roles_cabecera ORDER BY anio DESC, mes DESC").map(filaACamel),
+      (await consultar(db, "SELECT * FROM roles_cabecera ORDER BY anio DESC, mes DESC")).map(filaACamel),
     );
   });
 
   /** Empleados que entrarán al rol del mes y las novedades que ya se habían digitado. */
-  router.get("/periodo/:anio/:mes", (req, res) => {
+  router.get("/periodo/:anio/:mes", async (req, res) => {
     const { anio, mes } = leerPeriodo(req.params.anio, req.params.mes);
-    const regimenes = indexarRegimenes(listarRegimenes(db));
+    const regimenes = indexarRegimenes(await listarRegimenes(db));
     const guardadas = new Map(
-      consultar(db, "SELECT * FROM novedades WHERE anio = ? AND mes = ?", anio, mes)
+      (await consultar(db, "SELECT * FROM novedades WHERE anio = ? AND mes = ?", anio, mes))
         .map((n) => [Number(n.empleado_id), n]),
     );
     res.json({
       anio, mes,
-      existe: existeRol(db, anio, mes),
-      empleados: empleadosDelPeriodo(db, anio, mes).map((e) => {
+      existe: await existeRol(db, anio, mes),
+      empleados: (await empleadosDelPeriodo(db, anio, mes)).map((e) => {
         const g = guardadas.get(Number(e.id));
         return {
           id: e.id, nombres: e.nombres, cargo: e.cargo, sueldoBase: e.sueldo_base,
@@ -187,10 +186,10 @@ export function rutasRoles(db: DatabaseSync): Router {
     });
   });
 
-  router.post("/generar", (req, res) => {
+  router.post("/generar", async (req, res) => {
     const cuerpo = req.body ?? {};
     const { anio, mes } = leerPeriodo(cuerpo.anio, cuerpo.mes);
-    const empleados = empleadosDelPeriodo(db, anio, mes);
+    const empleados = await empleadosDelPeriodo(db, anio, mes);
     if (!empleados.length) throw new ErrorApi(400, ["No hay empleados activos para ese período."]);
 
     const errores: string[] = [];
@@ -209,17 +208,17 @@ export function rutasRoles(db: DatabaseSync): Router {
     }
     if (errores.length) throw new ErrorApi(400, errores);
 
-    const { rolId, avisos } = guardarRol(db, anio, mes, empleados, novedades);
+    const { rolId, avisos } = await guardarRol(db, anio, mes, empleados, novedades);
     res.status(201).json({ id: rolId, empleados: empleados.length, avisos });
   });
 
-  router.get("/:id", (req, res) => {
-    const { cabecera, detalle } = cargar(req.params.id);
+  router.get("/:id", async (req, res) => {
+    const { cabecera, detalle } = await cargar(req.params.id);
     res.json({ ...filaACamel(cabecera), detalle: detalle.map(filaACamel) });
   });
 
-  router.get("/:id/csv", (req, res) => {
-    const { cabecera, detalle } = cargar(req.params.id);
+  router.get("/:id/csv", async (req, res) => {
+    const { cabecera, detalle } = await cargar(req.params.id);
     const nombre = `rol_${cabecera.anio}_${String(cabecera.mes).padStart(2, "0")}.csv`;
     res
       .type("text/csv; charset=utf-8")
@@ -228,13 +227,13 @@ export function rutasRoles(db: DatabaseSync): Router {
   });
 
   /** Aportes del rol por empleado, para contrastarlos con el comprobante del IESS. */
-  router.get("/:id/iess", (req, res) => {
-    const { cabecera, detalle } = cargar(req.params.id);
+  router.get("/:id/iess", async (req, res) => {
+    const { cabecera, detalle } = await cargar(req.params.id);
     res.json(planillaIess(Number(cabecera.anio), Number(cabecera.mes), detalle));
   });
 
-  router.get("/:id/iess.csv", (req, res) => {
-    const { cabecera, detalle } = cargar(req.params.id);
+  router.get("/:id/iess.csv", async (req, res) => {
+    const { cabecera, detalle } = await cargar(req.params.id);
     const p = planillaIess(Number(cabecera.anio), Number(cabecera.mes), detalle);
     const filas: unknown[][] = p.filas.map((f) => [
       f.cedula, f.nombres, f.regimenAplicado, f.diasTrabajados, f.materiaGravada, f.tasaPersonal,
@@ -251,9 +250,9 @@ export function rutasRoles(db: DatabaseSync): Router {
       .send(documentoCsv(COLUMNAS_IESS, filas));
   });
 
-  router.delete("/:id", (req, res) => {
-    const { cabecera } = cargar(req.params.id);
-    ejecutar(db, "DELETE FROM roles_cabecera WHERE id = ?", Number(cabecera.id));
+  router.delete("/:id", async (req, res) => {
+    const { cabecera } = await cargar(req.params.id);
+    await ejecutar(db, "DELETE FROM roles_cabecera WHERE id = ?", Number(cabecera.id));
     res.status(204).end();
   });
 

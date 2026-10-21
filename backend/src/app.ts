@@ -4,7 +4,7 @@ import { join } from "node:path";
 import express from "express";
 import type { ErrorRequestHandler } from "express";
 
-import { abrirBase } from "./db.ts";
+import type { Base } from "./db.ts";
 import { rutasEmpleados } from "./rutas/empleados.ts";
 import { rutasEscala } from "./rutas/escala.ts";
 import { rutasParametros } from "./rutas/parametros.ts";
@@ -14,14 +14,11 @@ import { rutasRoles } from "./rutas/roles.ts";
 import { ErrorApi } from "./validaciones.ts";
 
 interface Opciones {
-  /** Ruta del archivo SQLite, o ":memory:" para pruebas. */
-  rutaBase: string;
   /** Carpeta con el build de Angular; si existe, se sirve desde aquí. */
   carpetaFrontend?: string;
 }
 
-export function crearApp({ rutaBase, carpetaFrontend }: Opciones) {
-  const db = abrirBase(rutaBase);
+export function crearApp(db: Base, { carpetaFrontend }: Opciones = {}) {
   const app = express();
   app.disable("x-powered-by");
   app.use(express.json({ limit: "100kb" }));
@@ -56,5 +53,5 @@ export function crearApp({ rutaBase, carpetaFrontend }: Opciones) {
   };
   app.use(manejarErrores);
 
-  return { app, db };
+  return app;
 }

@@ -9,8 +9,8 @@ ALTER TABLE empleados ADD COLUMN recibe_horas_extras INTEGER;
 
 -- Cada rol guarda cómo se pagó cada beneficio y cuánto fue aportable.
 -- Los roles anteriores provisionaban todo, así que quedan como 'acumulado'.
-ALTER TABLE roles_detalle ADD COLUMN ingresos_aportables REAL NOT NULL DEFAULT 0;
-ALTER TABLE roles_detalle ADD COLUMN beneficios_mensuales REAL NOT NULL DEFAULT 0;
+ALTER TABLE roles_detalle ADD COLUMN ingresos_aportables DOUBLE PRECISION NOT NULL DEFAULT 0;
+ALTER TABLE roles_detalle ADD COLUMN beneficios_mensuales DOUBLE PRECISION NOT NULL DEFAULT 0;
 ALTER TABLE roles_detalle ADD COLUMN decimo_tercero_modalidad TEXT NOT NULL DEFAULT 'acumulado';
 ALTER TABLE roles_detalle ADD COLUMN decimo_cuarto_modalidad TEXT NOT NULL DEFAULT 'acumulado';
 ALTER TABLE roles_detalle ADD COLUMN fondos_reserva_modalidad TEXT NOT NULL DEFAULT 'acumulado';

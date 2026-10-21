@@ -3,37 +3,38 @@
  * y los roles de pago de enero a septiembre de 2026.
  *
  *   npm --prefix backend run seed                 base vacía (o la que ya tenga datos: no la toca)
- *   npm --prefix backend run seed -- --reiniciar  guarda una copia de la base actual y empieza de cero
+ *   npm --prefix backend run seed -- --reiniciar  borra empleados, roles y novedades y empieza de cero
+ *
+ * Con DATABASE_URL en el entorno carga la base de Supabase; sin ella, la de PGlite en backend/data.
  */
-import { copyFileSync, existsSync, rmSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 
-import { abrirBase, uno } from "./db.ts";
+import { abrirBase, ejecutar, uno } from "./db.ts";
 import { ANIO_DEMO, cargarEmpleadosDemo, generarRolesDemo, MESES_DEMO } from "./demo.ts";
 
 const aqui = (ruta: string) => fileURLToPath(new URL(ruta, import.meta.url));
-const ruta = process.env.DATABASE ?? aqui("../data/rol_pagos.db");
+const destino = process.env.DATABASE_URL ?? process.env.DATABASE ?? aqui("../data/pglite");
 const reiniciar = process.argv.includes("--reiniciar");
 
-if (reiniciar && existsSync(ruta)) {
-  const sello = new Date().toISOString().slice(0, 19).replace(/[-:T]/g, "");
-  const respaldo = `${ruta}.respaldo-${sello}`;
-  copyFileSync(ruta, respaldo);
-  rmSync(ruta);
-  console.log(`Copia de la base anterior: ${respaldo}`);
+const db = await abrirBase(destino);
+if (reiniciar) {
+  // Los roles arrastran su detalle; los empleados sueltan puesto y responsable por las claves foráneas.
+  await ejecutar(db, "DELETE FROM roles_cabecera");
+  await ejecutar(db, "DELETE FROM novedades");
+  await ejecutar(db, "UPDATE puestos SET responsable_id = NULL");
+  await ejecutar(db, "DELETE FROM empleados");
 }
 
-const db = abrirBase(ruta);
-const hay = (tabla: string) => Number(uno(db, `SELECT COUNT(*) AS n FROM ${tabla}`)?.n ?? 0) > 0;
-if (hay("empleados") || hay("roles_cabecera")) {
-  console.error("La base ya tiene empleados o roles. Usa --reiniciar para empezar de cero (se guarda una copia).");
-  db.close();
+const hay = async (tabla: string) => Number((await uno(db, `SELECT COUNT(*) AS n FROM ${tabla}`))?.n ?? 0) > 0;
+if ((await hay("empleados")) || (await hay("roles_cabecera"))) {
+  console.error("La base ya tiene empleados o roles. Usa --reiniciar para empezar de cero (borra esos datos).");
+  await db.cerrar();
   process.exit(1);
 }
 
-const empleados = cargarEmpleadosDemo(db);
-const roles = generarRolesDemo(db);
+const empleados = await cargarEmpleadosDemo(db);
+const roles = await generarRolesDemo(db);
 console.log(
-  `Listo: ${empleados} empleados y ${roles} roles de pago (${MESES_DEMO[0]} a ${MESES_DEMO.at(-1)} de ${ANIO_DEMO}) en ${ruta}`,
+  `Listo: ${empleados} empleados y ${roles} roles de pago (${MESES_DEMO[0]} a ${MESES_DEMO.at(-1)} de ${ANIO_DEMO}).`,
 );
-db.close();
+await db.cerrar();

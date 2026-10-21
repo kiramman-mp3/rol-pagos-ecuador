@@ -1,66 +1,79 @@
 import assert from "node:assert/strict";
-import { mkdtempSync, readdirSync, rmSync } from "node:fs";
-import { DatabaseSync } from "node:sqlite";
-import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { readdirSync } from "node:fs";
 import { describe, it } from "node:test";
 
-import { abrirBase, versionEsquema } from "../src/db.ts";
+import { abrirBase, aPlaceholders, consultar, migrar, uno, versionEsquema } from "../src/db.ts";
 
 const ULTIMA = readdirSync(new URL("../src/migraciones/", import.meta.url))
   .filter((f) => f.endsWith(".sql"))
   .length;
 
 describe("migraciones del esquema", () => {
-  it("una base nueva queda en la última versión", () => {
-    const db = abrirBase(":memory:");
-    assert.equal(versionEsquema(db), ULTIMA);
-    db.close();
+  it("una base nueva queda en la última versión", async () => {
+    const db = await abrirBase(":memory:");
+    assert.equal(await versionEsquema(db), ULTIMA);
+    await db.cerrar();
   });
 
-  it("abrir la misma base dos veces no repite migraciones ni duplica datos", () => {
-    const carpeta = mkdtempSync(join(tmpdir(), "rol-"));
+  it("migrar otra vez no repite migraciones ni duplica datos", async () => {
+    const db = await abrirBase(":memory:");
     try {
-      const ruta = join(carpeta, "rol.db");
-      const primera = abrirBase(ruta);
-      const objetos = (db: DatabaseSync) =>
-        Number((db.prepare("SELECT COUNT(*) AS n FROM sqlite_master").get() as { n: number }).n);
-      const antes = objetos(primera);
-      primera.close();
-
-      const segunda = abrirBase(ruta);
-      assert.equal(versionEsquema(segunda), ULTIMA);
-      assert.equal(objetos(segunda), antes);
-      segunda.close();
+      const contar = async () => ({
+        tablas: Number((await uno(db, "SELECT COUNT(*) AS n FROM information_schema.columns WHERE table_schema = 'public'"))?.n),
+        regimenes: Number((await uno(db, "SELECT COUNT(*) AS n FROM regimenes"))?.n),
+        escala: Number((await uno(db, "SELECT COUNT(*) AS n FROM escala_salarial"))?.n),
+        puestos: Number((await uno(db, "SELECT COUNT(*) AS n FROM puestos"))?.n),
+      });
+      const antes = await contar();
+      await migrar(db);
+      assert.equal(await versionEsquema(db), ULTIMA);
+      assert.deepEqual(await contar(), antes);
     } finally {
-      rmSync(carpeta, { recursive: true, force: true });
+      await db.cerrar();
     }
   });
 
-  it("una base anterior a las migraciones (versión 0) se actualiza sin perder datos", () => {
-    const carpeta = mkdtempSync(join(tmpdir(), "rol-"));
+  it("los puestos de ejemplo traen su id escrito y el siguiente sigue desde ahí", async () => {
+    const db = await abrirBase(":memory:");
     try {
-      const ruta = join(carpeta, "vieja.db");
-      // Esquema original: tablas creadas sin ningún número de versión.
-      const vieja = new DatabaseSync(ruta);
-      vieja.exec(`CREATE TABLE empleados (
-        id INTEGER PRIMARY KEY AUTOINCREMENT, cedula TEXT NOT NULL UNIQUE, nombres TEXT NOT NULL,
-        cargo TEXT NOT NULL, sueldo_base REAL NOT NULL, fecha_ingreso TEXT NOT NULL,
-        tipo_contrato TEXT NOT NULL, activo INTEGER NOT NULL DEFAULT 1)`);
-      vieja.exec(`INSERT INTO empleados (cedula, nombres, cargo, sueldo_base, fecha_ingreso, tipo_contrato)
-        VALUES ('1801234566', 'Ana Antigua', 'Analista', 900, '2020-01-01', 'Indefinido')`);
-      vieja.close();
-
-      const db = abrirBase(ruta);
-      assert.equal(versionEsquema(db), ULTIMA);
-      const ana = db.prepare("SELECT nombres, sueldo_base FROM empleados").get() as {
-        nombres: string; sueldo_base: number;
-      };
-      assert.equal(ana.nombres, "Ana Antigua");
-      assert.equal(ana.sueldo_base, 900);
-      db.close();
+      const nuevo = await uno(
+        db,
+        `INSERT INTO puestos (nombre, funcion, responsabilidad, sector, escala_id)
+         VALUES ('Nuevo', 'f', 'r', 's', NULL) RETURNING id`,
+      );
+      assert.equal(nuevo?.id, 6);
+      assert.equal((await consultar(db, "SELECT id FROM puestos ORDER BY id")).length, 6);
     } finally {
-      rmSync(carpeta, { recursive: true, force: true });
+      await db.cerrar();
     }
+  });
+
+  it("los números salen como números y las transacciones se deshacen si algo falla", async () => {
+    const db = await abrirBase(":memory:");
+    try {
+      const fila = await uno(db, "SELECT COUNT(*) AS n, SUM(rmu) AS suma FROM escala_salarial");
+      assert.equal(typeof fila?.n, "number");
+      assert.equal(typeof fila?.suma, "number");
+
+      await assert.rejects(
+        db.transaccion(async (tx) => {
+          await tx.consultar("DELETE FROM escala_salarial", []);
+          throw new Error("falla a medias");
+        }),
+        /falla a medias/,
+      );
+      assert.equal((await uno(db, "SELECT COUNT(*) AS n FROM escala_salarial"))?.n, fila?.n);
+    } finally {
+      await db.cerrar();
+    }
+  });
+});
+
+describe("placeholders", () => {
+  it("cambia ? por $1, $2… sin tocar los que están dentro de un texto", () => {
+    assert.equal(
+      aPlaceholders("SELECT * FROM t WHERE a = ? AND b = '¿?' AND c = ?"),
+      "SELECT * FROM t WHERE a = $1 AND b = '¿?' AND c = $2",
+    );
   });
 });
