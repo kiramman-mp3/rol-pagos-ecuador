@@ -1,0 +1,80 @@
+:host { display: block; }
+
+/* Portada del mes: un bloque de color con la acción que sigue */
+.portada-mes {
+  position: relative; overflow: hidden;
+  padding: 2.5rem 2.5rem 2.75rem; border-radius: 28px; color: #fff;
+  background: linear-gradient(120deg, var(--marca) 0%, var(--noche) 100%);
+  box-shadow: 0 22px 40px -26px rgba(24, 35, 122, .9);
+}
+.portada-mes::before {
+  content: ""; position: absolute; right: -4rem; top: -6rem; width: 18rem; height: 18rem;
+  border-radius: 50%; background: var(--sol); opacity: .95;
+}
+.portada-mes::after {
+  content: ""; position: absolute; right: 7rem; bottom: -5rem; width: 10rem; height: 10rem;
+  border-radius: 50%; background: #ef4b3c; opacity: .9;
+}
+.portada-texto, .portada-mes .boton { position: relative; z-index: 1; }
+.portada-texto { max-width: 36rem; }
+.saludo { margin: 0 0 .5rem; color: #cfd6ff; font-weight: 600; }
+.portada-mes h1 { color: #fff; font-size: clamp(2rem, 4vw + 1rem, 3.2rem); line-height: 1.02; }
+.frase { margin: .9rem 0 0; font-size: 1.1rem; color: #e4e8ff; max-width: 32rem; }
+.portada-mes .boton-grande { margin-top: 1.75rem; font-size: 1.1rem; padding: 1.05rem 1.8rem; }
+
+/* Los cuatro pasos del mes */
+.pasos-mes {
+  list-style: none; margin: 2rem 0 0; padding: 0;
+  display: grid; grid-template-columns: repeat(4, 1fr); gap: 1rem; counter-reset: paso;
+}
+.paso {
+  position: relative; display: flex; flex-direction: column; align-items: flex-start; gap: .35rem;
+  padding: 1.25rem 1.25rem 1.1rem; border-radius: 20px;
+  background: var(--hoja); border: 1.5px solid var(--linea);
+}
+.paso h2 { font-size: 1.1rem; margin-top: .6rem; }
+.paso .boton-texto { margin-left: -.5rem; }
+.paso p { margin: 0 0 .6rem; color: var(--tinta-suave); font-size: .92rem; flex: 1; }
+.paso-marca {
+  display: grid; place-items: center; width: 2.4rem; height: 2.4rem; border-radius: 50%;
+  font: 800 1.1rem var(--display); background: var(--linea-suave); color: var(--tinta-suave);
+}
+.paso-hecho .paso-marca { background: var(--neto); color: #fff; }
+.paso-actual {
+  background: var(--sol-fondo); border-color: var(--sol);
+  box-shadow: 0 0 0 3px var(--sol), 0 18px 28px -20px rgba(154, 90, 0, .8);
+  transform: translateY(-4px);
+}
+.paso-actual .paso-marca { background: var(--sol); color: var(--tinta); }
+.paso-actual p { color: var(--tinta); }
+.paso-pendiente { background: transparent; border-style: dashed; }
+.paso-pendiente h2, .paso-pendiente p { color: var(--tinta-suave); }
+
+/* Cifras que importan */
+.resumen-mes { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1rem; margin-top: 2rem; }
+.dato {
+  display: flex; flex-direction: column; align-items: flex-start; gap: .15rem;
+  padding: 1.25rem 1.4rem; border-radius: 20px; background: var(--ingresos-fondo);
+}
+.dato-cifra { font: 800 clamp(1.8rem, 2vw + 1rem, 2.5rem)/1.05 var(--display); letter-spacing: -0.02em; color: var(--ingresos); }
+.dato-etiqueta { font-weight: 600; }
+.dato-nota { font-size: .85rem; color: var(--tinta-suave); }
+.dato-neto { background: var(--neto-fondo); }
+.dato-neto .dato-cifra { color: var(--neto); }
+.dato-costo { background: var(--provision-fondo); }
+.dato-costo .dato-cifra { color: var(--provision); }
+.dato-vacio { grid-column: span 2; background: var(--linea-suave); justify-content: center; }
+
+@media (max-width: 960px) {
+  .pasos-mes { grid-template-columns: repeat(2, 1fr); }
+  .resumen-mes { grid-template-columns: 1fr; }
+  .dato-vacio { grid-column: auto; }
+}
+@media (max-width: 560px) {
+  .portada-mes { padding: 1.5rem 1.25rem; border-radius: 22px; }
+  .portada-mes { padding-bottom: 3rem; }
+  .portada-mes::before { width: 9rem; height: 9rem; right: -2.5rem; top: auto; bottom: -3.5rem; }
+  .portada-mes::after { display: none; }
+  .pasos-mes { grid-template-columns: 1fr; }
+  .paso-actual { transform: none; }
+}

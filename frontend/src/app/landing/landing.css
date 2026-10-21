@@ -2,8 +2,8 @@
 
 .barra-interior { gap: 1.5rem; }
 .enlaces { display: flex; gap: 1.5rem; margin-left: .5rem; }
-.enlaces a { color: var(--tinta-suave); text-decoration: none; font-weight: 500; }
-.enlaces a:hover { color: var(--tinta); }
+.enlaces a { color: #dfe3ff; text-decoration: none; font-weight: 600; padding: .45rem .8rem; border-radius: 999px; }
+.enlaces a:hover { color: #fff; background: rgba(255, 255, 255, .12); }
 .entrar { margin-left: auto; }
 
 main { max-width: 1180px; margin: 0 auto; padding: 0 1rem; }
@@ -11,13 +11,18 @@ main { max-width: 1180px; margin: 0 auto; padding: 0 1rem; }
 /* ---- Portada ---- */
 .portada {
   display: grid; grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr);
-  gap: 3.5rem; align-items: center; padding: 4.5rem 0 4rem;
+  gap: 3.5rem; align-items: center; padding: 4.5rem 0 4rem; position: relative;
 }
+/* Dos círculos detrás del simulador, con los colores de la marca */
+.portada::before, .portada::after { content: ""; position: absolute; border-radius: 50%; z-index: 0; pointer-events: none; }
+.portada::before { width: 15rem; height: 15rem; right: -3.5rem; top: 1.5rem; background: var(--sol); }
+.portada::after { width: 7rem; height: 7rem; right: 18rem; bottom: 1.2rem; background: #ef4b3c; }
+.portada-texto, .simulador { position: relative; z-index: 1; }
 .portada h1 {
   font-size: clamp(2.3rem, 4.2vw + .8rem, 3.9rem); line-height: 1.04; letter-spacing: -0.025em;
   max-width: 15ch;
 }
-.entrada-texto { font-size: 1.15rem; color: var(--tinta-suave); max-width: 34rem; margin: 1.5rem 0 2rem; }
+.entrada-texto { font-size: 1.2rem; color: var(--tinta-suave); max-width: 34rem; margin: 1.5rem 0 2rem; }
 .boton-grande { font-size: 1.1rem; padding: 1rem 1.6rem; }
 .portada .acciones { gap: 1.5rem; }
 .nota { margin: 1rem 0 0; font-size: .9rem; color: var(--tinta-suave); }
@@ -44,18 +49,25 @@ main { max-width: 1180px; margin: 0 auto; padding: 0 1rem; }
 .desglose .provision dt { color: var(--provision); font-weight: 600; }
 
 /* ---- Secciones ---- */
-.seccion { padding: 3.5rem 0; border-top: 1px solid var(--linea); }
+.seccion { padding: 3.5rem 0; }
 .seccion > h2, .cierre h2 { font-size: clamp(1.6rem, 2vw + 1rem, 2.3rem); max-width: 24ch; }
 .subtitulo { margin: .75rem 0 0; color: var(--tinta-suave); max-width: 40rem; }
 
 .pasos { list-style: none; margin: 2rem 0 0; padding: 0; display: grid; grid-template-columns: repeat(3, 1fr); gap: 1.5rem; counter-reset: paso; }
-.pasos li { counter-increment: paso; padding-top: 1rem; border-top: 3px solid var(--tinta); }
-.pasos li::before { content: counter(paso); display: block; font: 700 2.6rem/1 var(--display); color: var(--ingresos); margin-bottom: .75rem; }
+.pasos li { counter-increment: paso; padding: 1.4rem; border-radius: 22px; background: var(--ingresos-fondo); }
+.pasos li:nth-child(2) { background: var(--sol-fondo); }
+.pasos li:nth-child(3) { background: var(--neto-fondo); }
+.pasos li::before {
+  content: counter(paso); display: grid; place-items: center; width: 2.8rem; height: 2.8rem; border-radius: 50%;
+  font: 800 1.4rem var(--display); background: var(--marca); color: #fff; margin-bottom: 1rem;
+}
+.pasos li:nth-child(2)::before { background: var(--sol); color: var(--tinta); }
+.pasos li:nth-child(3)::before { background: var(--neto); }
 .pasos h3 { font-size: 1.15rem; margin-bottom: .4rem; }
-.pasos p { margin: 0; color: var(--tinta-suave); }
+.pasos p { margin: 0; color: var(--tinta); }
 
 .reglas { display: grid; grid-template-columns: 1fr 1.4fr; gap: 1.5rem; margin-top: 2rem; align-items: start; }
-.grupo { background: var(--hoja); border: 1px solid var(--linea); border-radius: var(--radio); padding: 1.25rem; box-shadow: inset 0 4px 0 var(--linea); }
+.grupo { background: var(--hoja); border: 1px solid var(--linea); border-radius: 22px; padding: 1.4rem; box-shadow: inset 0 4px 0 var(--linea); }
 .grupo.g-descuentos { box-shadow: inset 0 4px 0 var(--descuentos); }
 .grupo.g-provision { box-shadow: inset 0 4px 0 var(--provision); background: var(--provision-fondo); border-color: #e7d29b; }
 .grupo h3 { font-size: 1.1rem; margin: .5rem 0 .75rem; }
@@ -65,17 +77,20 @@ main { max-width: 1180px; margin: 0 auto; padding: 0 1rem; }
 .grupo dt { font-weight: 600; }
 .grupo dd { margin: 0; text-align: right; }
 
-.tabla-ir { margin-top: 1.5rem; background: var(--hoja); border: 1px solid var(--linea); border-radius: var(--radio); }
+.tabla-ir { margin-top: 1.5rem; background: var(--hoja); border: 1px solid var(--linea); border-radius: 18px; overflow: hidden; }
 .tabla-ir summary { cursor: pointer; padding: 1rem 1.25rem; font-weight: 600; color: var(--marca); }
 .tabla-ir[open] summary { border-bottom: 1px solid var(--linea); }
 
 /* ---- Cierre y pie ---- */
-.cierre { margin: 1rem 0 0; padding: 3.5rem 1.5rem; background: var(--tinta); color: #fff; border-radius: var(--radio); text-align: center; }
+.cierre {
+  position: relative; overflow: hidden; margin: 1rem 0 0; padding: 4rem 1.5rem; color: #fff; border-radius: 28px; text-align: center;
+  background: linear-gradient(120deg, var(--marca) 0%, var(--noche) 100%);
+}
+.cierre::before { content: ""; position: absolute; left: -3rem; bottom: -5rem; width: 12rem; height: 12rem; border-radius: 50%; background: var(--sol); }
+.cierre::after { content: ""; position: absolute; right: 3rem; top: -3rem; width: 7rem; height: 7rem; border-radius: 50%; background: #ef4b3c; }
+.cierre > * { position: relative; z-index: 1; }
 .cierre h2 { color: #fff; margin: 0 auto; }
-.cierre p { color: #c8d0e0; margin: .75rem 0 1.75rem; }
-.cierre .boton { background: #fff; color: var(--tinta); border-color: #fff; }
-.cierre .boton:hover { background: var(--ingresos-fondo); border-color: var(--ingresos-fondo); color: var(--tinta); }
-.cierre .boton:focus-visible { outline-color: #fff; }
+.cierre p { color: #e4e8ff; margin: .75rem 0 1.75rem; }
 
 .pie { max-width: 1180px; margin: 0 auto; padding: 2rem 1rem 3rem; color: var(--tinta-suave); font-size: .9rem; }
 .pie p { max-width: 46rem; margin: 0; }
@@ -85,6 +100,8 @@ main { max-width: 1180px; margin: 0 auto; padding: 0 1rem; }
   .portada { grid-template-columns: 1fr; gap: 2.5rem; padding: 2.5rem 0 3rem; }
   .pasos, .reglas { grid-template-columns: 1fr; }
   .enlaces { display: none; }
+  .portada::before { width: 9rem; height: 9rem; right: -2rem; top: auto; bottom: 28rem; }
+  .portada::after { display: none; }
 }
 @media (max-width: 480px) {
   .campos { grid-template-columns: 1fr; }

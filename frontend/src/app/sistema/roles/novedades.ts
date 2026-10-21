@@ -36,9 +36,21 @@ const COLUMNAS: { campo: Campo; etiqueta: string; corte?: boolean; extra?: boole
 @Component({
   selector: 'app-novedades-mes',
   imports: [RouterLink, DineroPipe, PercentPipe],
+  styles: `
+    .volver { margin-left: -.5rem; }
+    .barra-fija {
+      position: sticky; bottom: .75rem; z-index: 5; margin-top: 1.25rem;
+      display: flex; justify-content: space-between; align-items: center; gap: 1rem; flex-wrap: wrap;
+      padding: .8rem 1.1rem .8rem 1.4rem; border-radius: 999px;
+      background: var(--noche); color: #fff; box-shadow: 0 18px 30px -14px rgba(24, 35, 122, .8);
+    }
+    .barra-fija-texto { margin: 0; }
+    .barra-fija .boton-claro { box-shadow: none; }
+  `,
   template: `
     <div class="encabezado">
       <div>
+        <a class="boton-texto volver" routerLink="/sistema/roles">‹ Roles de pago</a>
         <h1>Novedades de {{ nombreMes() }} {{ anio() }}</h1>
         <p class="apoyo">Todo es opcional. Lo que dejes en blanco cuenta como cero.</p>
       </div>
@@ -105,11 +117,19 @@ const COLUMNAS: { campo: Campo; etiqueta: string; corte?: boolean; extra?: boole
             </div>
           </div>
 
-          <div class="acciones" style="margin-top: 1.25rem">
-            <button class="boton" [disabled]="generando()">
-              Generar rol de {{ filas().length }} empleados
-            </button>
-            <a class="boton boton-claro" routerLink="/sistema/roles">Cancelar</a>
+          <div class="barra-fija no-imprimir">
+            <p class="barra-fija-texto">
+              <strong>{{ filas().length }} {{ filas().length === 1 ? 'persona' : 'personas' }}</strong>
+              entran al rol.
+              @if (conNovedades() === 0) { Ninguna tiene novedades todavía. }
+              @else { {{ conNovedades() }} {{ conNovedades() === 1 ? 'tiene' : 'tienen' }} novedades. }
+            </p>
+            <div class="acciones">
+              <a class="boton boton-claro" routerLink="/sistema/roles">Cancelar</a>
+              <button class="boton boton-sol" [disabled]="generando()">
+                {{ generando() ? 'Generando…' : datos()?.existe ? 'Recalcular el rol' : 'Generar el rol' }}
+              </button>
+            </div>
           </div>
         </form>
 
@@ -159,6 +179,9 @@ export class NovedadesMes {
   protected readonly columnas = COLUMNAS;
   protected readonly filas = signal<Fila[]>([]);
   protected readonly generando = signal(false);
+  protected readonly conNovedades = computed(
+    () => this.filas().filter((f) => COLUMNAS.some((c) => Number(f[c.campo]) > 0)).length,
+  );
   protected readonly nombreMes = computed(() => this.parametros()?.meses[Number(this.mes()) - 1] ?? '');
   protected readonly reglasPropias = computed(
     () => this.parametros()?.regimenes.filter((r) => r.tipo === 'reglas') ?? [],

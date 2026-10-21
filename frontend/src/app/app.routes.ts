@@ -15,7 +15,12 @@ export const routes: Routes = [
     path: 'sistema',
     loadComponent: () => import('./sistema/shell').then((m) => m.Shell),
     children: [
-      { path: '', pathMatch: 'full', redirectTo: 'empleados' },
+      { path: '', pathMatch: 'full', redirectTo: 'inicio' },
+      {
+        path: 'inicio',
+        title: 'Inicio | Rol de pagos',
+        loadComponent: () => import('./sistema/inicio/inicio').then((m) => m.Inicio),
+      },
       {
         path: 'empleados',
         title: 'Empleados | Rol de pagos',
