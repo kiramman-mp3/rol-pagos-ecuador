@@ -6,6 +6,7 @@
 [![PostgreSQL](https://img.shields.io/badge/PostgreSQL-Supabase-3ecf8e?style=flat-square&logo=supabase&logoColor=white)](https://supabase.com/)
 [![Node](https://img.shields.io/badge/Node-%3E%3D%2024-339933?style=flat-square&logo=nodedotjs&logoColor=white)](https://nodejs.org/)
 [![Deploy](https://img.shields.io/badge/Deploy-Vercel-000000?style=flat-square&logo=vercel&logoColor=white)](https://vercel.com/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg?style=flat-square)](LICENSE)
 
 **Rol de Pagos Ecuador** es un sistema de nómina para Ecuador cuyas reglas de ley se **parametrizan** desde la propia aplicación: régimen laboral, salario básico, escala salarial, décimos, fondos de reserva, horas extras y aportes al IESS. Una API en **Express**, una aplicación en **Angular**, una página de inicio pública y, detrás del botón **Ingresar al sistema**, el sistema completo.
 
@@ -520,6 +521,12 @@ Cómo se declaran los aportes. No se encontró un formato público de archivo pa
 - [Contapp: planilla del IESS en Ecuador](https://www.contapp.ec/blogs/planilla-iess-ecuador): Apareció al buscar el formato de la planilla; no se abrió.
 
 </details>
+
+---
+
+## 📄 Licencia
+
+Este proyecto está bajo la Licencia MIT. Consulta el archivo [LICENSE](LICENSE) para obtener más detalles.
 
 ---
 
