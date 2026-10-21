@@ -72,7 +72,9 @@
 }
 @media (max-width: 560px) {
   .portada-mes { padding: 1.5rem 1.25rem; border-radius: 22px; }
-  .portada-mes::before { right: -7rem; top: -8rem; }
+  .portada-mes { padding-bottom: 3rem; }
+  .portada-mes::before { width: 9rem; height: 9rem; right: -2.5rem; top: auto; bottom: -3.5rem; }
+  .portada-mes::after { display: none; }
   .pasos-mes { grid-template-columns: 1fr; }
   .paso-actual { transform: none; }
 }

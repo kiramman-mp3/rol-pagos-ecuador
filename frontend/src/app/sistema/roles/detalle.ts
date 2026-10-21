@@ -32,7 +32,7 @@ import type { Modalidad, PlanillaIess, RolCompleto, RolDetalle } from '../../cor
           <h1>{{ nombreMes() }} {{ r.anio }} <span class="insignia insignia-neto no-imprimir">Rol generado</span></h1>
           <p class="apoyo">
             {{ parametros()?.empresa?.nombre }}, RUC {{ parametros()?.empresa?.ruc }}.
-            Generado el {{ r.generadoEn.slice(0, 10) }} a las {{ r.generadoEn.slice(11, 16) }}.
+            Generado el {{ fechaGeneracion(r.generadoEn) }}.
           </p>
         </div>
         <div class="acciones no-imprimir">
@@ -362,6 +362,14 @@ export class DetalleRol {
     return sumar([
       d.valorHorasSuplementarias, d.valorHorasExtraordinarias, d.valorHorasDescanso, d.valorRecargoNocturno,
     ]);
+  }
+
+  /** 2026-10-20T23:33:17 -> 20 de octubre de 2026, 23:33 */
+  protected fechaGeneracion(iso: string): string {
+    const f = new Date(iso);
+    if (Number.isNaN(f.getTime())) return iso;
+    const dia = f.toLocaleDateString('es-EC', { day: 'numeric', month: 'long', year: 'numeric' });
+    return `${dia}, ${iso.slice(11, 16)}`;
   }
 
   protected ir(evento: Event, id: string) {

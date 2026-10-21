@@ -12,6 +12,8 @@ import type { Empleado } from '../../core/modelos';
   selector: 'app-lista-empleados',
   imports: [RouterLink, DineroPipe],
   styles: `
+    .persona > span:last-child { min-width: 9.5rem; }
+    @media (max-width: 720px) { .ocultar-movil { display: none; } }
     .herramientas { display: flex; align-items: center; gap: 1rem; flex-wrap: wrap; margin-bottom: 1rem; }
     .buscador { flex: 1 1 18rem; max-width: 26rem; border-radius: 999px; padding-inline: 1.1rem; }
     .filtros { display: flex; gap: .4rem; flex-wrap: wrap; }
@@ -64,8 +66,8 @@ import type { Empleado } from '../../core/modelos';
               <th>Empleado</th>
               <th>Cargo</th>
               <th>Régimen</th>
-              <th>Contrato</th>
-              <th class="num">Ingreso</th>
+              <th class="ocultar-movil">Contrato</th>
+              <th class="num ocultar-movil">Ingreso</th>
               <th class="num"><span class="th-largo">Sueldo base</span><span class="th-corto" aria-hidden="true">Sueldo</span></th>
               <th>Estado</th>
               <th><span class="solo-lectura">Acciones</span></th>
@@ -85,8 +87,8 @@ import type { Empleado } from '../../core/modelos';
                   {{ nombreRegimen(e.regimen) }}
                   @if (e.categoriaLoep) { <span class="secundario">{{ e.categoriaLoep === 'obrero' ? 'Obrero' : 'Servidor' }}</span> }
                 </td>
-                <td>{{ e.tipoContrato }}</td>
-                <td class="num">{{ fecha(e.fechaIngreso) }}</td>
+                <td class="ocultar-movil">{{ e.tipoContrato }}</td>
+                <td class="num ocultar-movil">{{ fecha(e.fechaIngreso) }}</td>
                 <td class="num">{{ e.sueldoBase | dinero }}</td>
                 <td>
                   <span class="estado" [class.estado-activo]="e.activo" [class.estado-inactivo]="!e.activo">
