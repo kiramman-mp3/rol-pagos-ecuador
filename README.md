@@ -19,7 +19,9 @@ Para desarrollar con recarga automática:
 npm run dev          # API en :3000 y Angular en http://localhost:4200
 ```
 
-La base `backend/data/rol_pagos.db` se crea sola al arrancar. Si ya existía de una versión anterior, se actualiza sin perder datos (ver [Migraciones](#migraciones)). Borrarla reinicia todo.
+La base es **PostgreSQL**. Con la variable `DATABASE_URL` (`postgresql://…`, por ejemplo la de Supabase) se usa esa base; sin ella, una base PGlite (un Postgres dentro del proceso) en `backend/data/pglite`, para trabajar sin instalar nada. El esquema se crea y se actualiza solo al arrancar (ver [Migraciones](#migraciones)). Borrar `backend/data/pglite` reinicia la base local.
+
+En Vercel hay que definir `DATABASE_URL` con la cadena del **pooler** de Supabase (puerto 6543): el host directo `db.<proyecto>.supabase.co` solo tiene IPv6 y Vercel no lo alcanza.
 
 | Comando | Qué hace |
 |---|---|
@@ -29,7 +31,7 @@ La base `backend/data/rol_pagos.db` se crea sola al arrancar. Si ya existía de 
 | `npm test` | Pruebas del backend (Node) y del frontend (Vitest) |
 | `npm run lint` | Tipos y ESLint de ambos proyectos |
 | `npm --prefix backend run seed` | Llena una base vacía con 12 empleados y los roles de enero a septiembre de 2026 |
-| `npm --prefix backend run seed -- --reiniciar` | Igual, pero antes guarda una copia de la base actual (`rol_pagos.db.respaldo-…`) y empieza de cero |
+| `npm --prefix backend run seed -- --reiniciar` | Igual, pero antes borra empleados, roles y novedades de la base y empieza de cero |
 
 ## Qué pide la guía y cómo se cumple
 
@@ -59,7 +61,7 @@ La base `backend/data/rol_pagos.db` se crea sola al arrancar. Si ya existía de 
 ## Estructura
 
 ```
-backend/                  API REST (Express 5, TypeScript, node:sqlite)
+backend/                  API REST (Express 5, TypeScript, PostgreSQL)
   src/calculos.ts         Motor de cálculo: funciones puras. Empezar a leer aquí.
   src/regimenes.ts        Regímenes laborales, reglas por régimen y opciones por empleado
   src/parametros.ts       SBU y tabla del IR por año
@@ -67,7 +69,7 @@ backend/                  API REST (Express 5, TypeScript, node:sqlite)
   src/iess.ts             Cuadro de conciliación con el IESS
   src/rutas/              empleados, roles, parámetros, regímenes y escala
   src/migraciones/        Esquema versionado: 001 a 006 (SQL numerado)
-  src/db.ts               SQLite sin ORM y ejecutor de migraciones
+  src/db.ts               PostgreSQL sin ORM (pg, o PGlite en pruebas y en local) y ejecutor de migraciones
   src/validaciones.ts     Cédula, números y fechas
   test/                   node:test, incluida la API completa
 frontend/                 Angular 22 (componentes standalone, señales, sin zone.js)
@@ -171,7 +173,7 @@ El IESS no recibe un archivo de aportes: arma la planilla en su portal a partir 
 
 ## Migraciones
 
-El esquema vive en `backend/src/migraciones/NNN_nombre.sql`. La versión aplicada queda en `PRAGMA user_version`, así que abrir la misma base dos veces no repite nada y una base creada antes de las migraciones se pone al día sin perder datos. Para cambiar el esquema se agrega el siguiente archivo numerado; no se edita uno ya aplicado.
+El esquema vive en `backend/src/migraciones/NNN_nombre.sql`. Las aplicadas quedan en la tabla `esquema_migraciones`, así que abrir la misma base dos veces no repite nada; cada una corre en una transacción con un candado, para que dos instancias que arrancan a la vez no la apliquen dos veces. Para cambiar el esquema se agrega el siguiente archivo numerado; no se edita uno ya aplicado.
 
 | Migración | Qué agrega |
 |---|---|

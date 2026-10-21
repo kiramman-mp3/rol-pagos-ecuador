@@ -1,9 +1,7 @@
 /** Parámetros anuales (SBU y tabla del IR) guardados en la base. */
-import type { DatabaseSync } from "node:sqlite";
-
 import type { TramoIR } from "./calculos.ts";
 import { consultar, ejecutar, uno } from "./db.ts";
-import type { Fila } from "./db.ts";
+import type { Base, Fila } from "./db.ts";
 import { ErrorApi } from "./validaciones.ts";
 
 export interface ParametrosAnio {
@@ -20,21 +18,21 @@ const aParametros = (fila: Fila): ParametrosAnio => ({
   fuente: String(fila.fuente ?? ""),
 });
 
-export function aniosConParametros(db: DatabaseSync): number[] {
-  return consultar(db, "SELECT anio FROM parametros_anuales ORDER BY anio DESC").map((f) => Number(f.anio));
+export async function aniosConParametros(db: Base): Promise<number[]> {
+  return (await consultar(db, "SELECT anio FROM parametros_anuales ORDER BY anio DESC")).map((f) => Number(f.anio));
 }
 
 /**
  * Parámetros de un año. Si ese año no tiene, se usa el más reciente anterior y se
  * avisa (`exacto: false`); si no hay ninguno anterior, se usa el más antiguo.
  */
-export function parametrosDelAnio(
-  db: DatabaseSync, anio: number,
-): { parametros: ParametrosAnio; exacto: boolean } {
+export async function parametrosDelAnio(
+  db: Base, anio: number,
+): Promise<{ parametros: ParametrosAnio; exacto: boolean }> {
   const fila =
-    uno(db, "SELECT * FROM parametros_anuales WHERE anio = ?", anio) ??
-    uno(db, "SELECT * FROM parametros_anuales WHERE anio < ? ORDER BY anio DESC LIMIT 1", anio) ??
-    uno(db, "SELECT * FROM parametros_anuales ORDER BY anio LIMIT 1");
+    (await uno(db, "SELECT * FROM parametros_anuales WHERE anio = ?", anio)) ??
+    (await uno(db, "SELECT * FROM parametros_anuales WHERE anio < ? ORDER BY anio DESC LIMIT 1", anio)) ??
+    (await uno(db, "SELECT * FROM parametros_anuales ORDER BY anio LIMIT 1"));
   if (!fila) throw new ErrorApi(500, ["No hay parámetros anuales cargados."]);
   const parametros = aParametros(fila);
   return { parametros, exacto: parametros.anio === anio };
@@ -76,10 +74,10 @@ export function validarTablaIr(tabla: unknown): TramoIR[] {
   }));
 }
 
-export function guardarParametros(
-  db: DatabaseSync, anio: number, sbu: number, tablaIr: TramoIR[], fuente: string,
+export async function guardarParametros(
+  db: Base, anio: number, sbu: number, tablaIr: TramoIR[], fuente: string,
 ) {
-  ejecutar(
+  await ejecutar(
     db,
     `INSERT INTO parametros_anuales (anio, sbu, tabla_ir, fuente) VALUES (?, ?, ?, ?)
      ON CONFLICT(anio) DO UPDATE SET sbu = excluded.sbu, tabla_ir = excluded.tabla_ir, fuente = excluded.fuente`,

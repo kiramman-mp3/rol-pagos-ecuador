@@ -1,10 +1,8 @@
 /** Regímenes laborales guardados en la base y las reglas que de ellos salen. */
-import type { DatabaseSync } from "node:sqlite";
-
 import { MODALIDADES, REGLAS_CT_2026 } from "./calculos.ts";
 import type { Modalidad, OpcionesRol, ReglasRol } from "./calculos.ts";
 import { consultar, ejecutar, uno } from "./db.ts";
-import type { Fila } from "./db.ts";
+import type { Base, Fila } from "./db.ts";
 import type { ParametrosAnio } from "./parametros.ts";
 import { ErrorApi } from "./validaciones.ts";
 
@@ -69,12 +67,12 @@ function aRegimen(f: Fila): Regimen {
   };
 }
 
-export function listarRegimenes(db: DatabaseSync): Regimen[] {
-  return consultar(db, "SELECT * FROM regimenes ORDER BY CASE codigo WHEN 'CODIGO_TRABAJO' THEN 0 ELSE 1 END, nombre").map(aRegimen);
+export async function listarRegimenes(db: Base): Promise<Regimen[]> {
+  return (await consultar(db, "SELECT * FROM regimenes ORDER BY CASE codigo WHEN 'CODIGO_TRABAJO' THEN 0 ELSE 1 END, nombre")).map(aRegimen);
 }
 
-export function buscarRegimen(db: DatabaseSync, codigo: string): Regimen | undefined {
-  const fila = uno(db, "SELECT * FROM regimenes WHERE codigo = ?", codigo);
+export async function buscarRegimen(db: Base, codigo: string): Promise<Regimen | undefined> {
+  const fila = await uno(db, "SELECT * FROM regimenes WHERE codigo = ?", codigo);
   return fila ? aRegimen(fila) : undefined;
 }
 
@@ -150,8 +148,8 @@ export function opcionesDe(
 type Cuerpo = Record<string, unknown>;
 
 /** Valida y guarda los cambios de un régimen; devuelve el régimen actualizado. */
-export function actualizarRegimen(db: DatabaseSync, codigo: string, cuerpo: Cuerpo): Regimen {
-  const actual = buscarRegimen(db, codigo);
+export async function actualizarRegimen(db: Base, codigo: string, cuerpo: Cuerpo): Promise<Regimen> {
+  const actual = await buscarRegimen(db, codigo);
   if (!actual) throw new ErrorApi(404, ["El régimen no existe."]);
   const errores: string[] = [];
 
@@ -183,7 +181,7 @@ export function actualizarRegimen(db: DatabaseSync, codigo: string, cuerpo: Cuer
   const notas = texto("notas", 1000);
 
   if (actual.tipo === "mixto") {
-    const destinos = new Map(listarRegimenes(db).map((r) => [r.codigo, r]));
+    const destinos = new Map((await listarRegimenes(db)).map((r) => [r.codigo, r]));
     const valido = (campo: string, etiqueta: string) => {
       const d = String(cuerpo[campo] ?? "");
       if (destinos.get(d)?.tipo !== "reglas") errores.push(`${etiqueta}: elige un régimen con reglas propias.`);
@@ -192,9 +190,9 @@ export function actualizarRegimen(db: DatabaseSync, codigo: string, cuerpo: Cuer
     const servidor = valido("regimenServidor", "Régimen de los servidores");
     const obrero = valido("regimenObrero", "Régimen de los obreros");
     if (errores.length) throw new ErrorApi(400, errores);
-    ejecutar(db, "UPDATE regimenes SET nombre = ?, regimen_servidor = ?, regimen_obrero = ?, verificado = ?, notas = ? WHERE codigo = ?",
+    await ejecutar(db, "UPDATE regimenes SET nombre = ?, regimen_servidor = ?, regimen_obrero = ?, verificado = ?, notas = ? WHERE codigo = ?",
       nombre, servidor, obrero, verificado, notas, codigo);
-    return buscarRegimen(db, codigo)!;
+    return (await buscarRegimen(db, codigo))!;
   }
 
   const iessPersonal = rango("iessPersonal", "Aporte personal al IESS", 0, 1);
@@ -210,7 +208,7 @@ export function actualizarRegimen(db: DatabaseSync, codigo: string, cuerpo: Cuer
   const topeExt = tope("topeExtraordinariasMes", "Tope de horas extraordinarias");
   if (errores.length) throw new ErrorApi(400, errores);
 
-  ejecutar(
+  await ejecutar(
     db,
     `UPDATE regimenes SET nombre = ?, iess_personal = ?, iess_patronal = ?, recargo_suplementarias = ?,
        recargo_extraordinarias = ?, recargo_descanso = ?, recargo_nocturno = ?, tope_suplementarias_mes = ?,
@@ -221,5 +219,5 @@ export function actualizarRegimen(db: DatabaseSync, codigo: string, cuerpo: Cuer
     bool("aplicaDecimoTercero"), bool("aplicaDecimoCuarto"), bool("aplicaFondosReserva"), bool("aplicaHorasExtras"),
     verificado, notas, codigo,
   );
-  return buscarRegimen(db, codigo)!;
+  return (await buscarRegimen(db, codigo))!;
 }

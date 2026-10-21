@@ -2,13 +2,13 @@
 -- Antes eran constantes en el código; ahora se editan sin tocar nada más.
 CREATE TABLE IF NOT EXISTS parametros_anuales (
     anio     INTEGER PRIMARY KEY,
-    sbu      REAL NOT NULL CHECK (sbu > 0),
+    sbu      DOUBLE PRECISION NOT NULL CHECK (sbu > 0),
     -- Tramos del SRI como JSON: [{ "desde", "hasta" (null en el último), "cuota", "porcentaje" }]
     tabla_ir TEXT NOT NULL,
     fuente   TEXT NOT NULL DEFAULT ''
 );
 
-INSERT OR IGNORE INTO parametros_anuales (anio, sbu, tabla_ir, fuente) VALUES (
+INSERT INTO parametros_anuales (anio, sbu, tabla_ir, fuente) VALUES (
     2026,
     482,
     '[{"desde":0,"hasta":12208,"cuota":0,"porcentaje":0},
@@ -22,4 +22,5 @@ INSERT OR IGNORE INTO parametros_anuales (anio, sbu, tabla_ir, fuente) VALUES (
       {"desde":82679,"hasta":109956,"cuota":15025,"porcentaje":0.35},
       {"desde":109956,"hasta":null,"cuota":24572,"porcentaje":0.37}]',
     'SBU: Acuerdo MDT-2025-195. IR: Resolución NAC-DGERCGC25-00000043 del SRI.'
-);
+)
+ON CONFLICT DO NOTHING;
