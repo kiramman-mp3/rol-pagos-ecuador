@@ -12,16 +12,19 @@ import { ParametrosLey } from '../core/api';
     <header class="barra">
       <div class="barra-interior">
         <a class="marca" routerLink="/" title="Volver a la página de inicio">
+          <span class="bandera" aria-hidden="true"><i></i><i></i><i></i></span>
           Rol de pagos<small>Ecuador 2026</small>
         </a>
         <nav class="navegacion" aria-label="Principal">
+          <a routerLink="/sistema/inicio" routerLinkActive ariaCurrentWhenActive="page">Inicio</a>
           <a routerLink="/sistema/empleados" routerLinkActive ariaCurrentWhenActive="page">Empleados</a>
           <a routerLink="/sistema/roles" routerLinkActive ariaCurrentWhenActive="page">Roles de pago</a>
+          <a routerLink="/sistema/organico" routerLinkActive ariaCurrentWhenActive="page">Orgánico</a>
           <a routerLink="/sistema/parametros" routerLinkActive ariaCurrentWhenActive="page">Parámetros</a>
         </nav>
         <span class="empresa">
-          {{ parametros()?.empresa?.nombre }}
-          · <a routerLink="/informacion">Información</a>
+          <strong>{{ parametros()?.empresa?.nombre }}</strong>
+          <a routerLink="/informacion">Información</a>
         </span>
       </div>
     </header>

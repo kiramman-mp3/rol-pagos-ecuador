@@ -1,13 +1,15 @@
 import { Router } from "express";
 import type { DatabaseSync } from "node:sqlite";
 
-import { CONTRATOS, EMPLEADOS_DEMO } from "../config.ts";
+import { CONTRATOS } from "../config.ts";
+import { cargarEmpleadosDemo } from "../demo.ts";
 import { MODALIDADES } from "../calculos.ts";
 import type { Modalidad } from "../calculos.ts";
 import { consultar, ejecutar, filaACamel, uno } from "../db.ts";
 import type { Fila } from "../db.ts";
 import { parametrosDelAnio } from "../parametros.ts";
-import { buscarGrado } from "../escala.ts";
+import { buscarGrado, listarEscala } from "../escala.ts";
+import { buscarPuesto, listarPuestos, soltarResponsable } from "../puestos.ts";
 import { CATEGORIAS_LOEP, indexarRegimenes, listarRegimenes, regimenAplicado } from "../regimenes.ts";
 import { aDecimal, cedulaValida, ErrorApi, fechaIsoValida } from "../validaciones.ts";
 
@@ -21,6 +23,7 @@ interface DatosEmpleado {
   regimen: string;
   categoriaLoep: string | null;
   escalaId: number | null;
+  puestoId: number | null;
   /** null = lo que diga el régimen */
   pagoDecimoTercero: Modalidad | null;
   pagoDecimoCuarto: Modalidad | null;
@@ -60,21 +63,48 @@ function validar(
     }
   }
 
-  // Grado de la escala salarial (opcional): debe ser de la escala del régimen que se aplica.
-  let escalaId: number | null = null;
-  const pedido = cuerpo.escalaId;
-  const grado = pedido === null || pedido === undefined || pedido === "" ? undefined : buscarGrado(db, Number(pedido));
-  if (pedido !== null && pedido !== undefined && pedido !== "") {
-    let aplicado: string | null = null;
+  const vacio = (v: unknown) => v === null || v === undefined || v === "";
+  let aplicado: string | null = null;
+  if (elegido) {
     try {
-      aplicado = elegido ? regimenAplicado(indexarRegimenes(listarRegimenes(db)), regimen, categoriaLoep).codigo : null;
+      aplicado = regimenAplicado(indexarRegimenes(listarRegimenes(db)), regimen, categoriaLoep).codigo;
     } catch {
       /* la categoría faltante ya quedó reportada arriba */
     }
+  }
+
+  // Puesto del orgánico: si el régimen aplicado tiene puestos, se identifica primero (función,
+  // responsabilidad, sector) y de él sale el nivel de la escala que sirve de referencia al sueldo.
+  let puestoId: number | null = null;
+  const puesto = vacio(cuerpo.puestoId) ? undefined : buscarPuesto(db, Number(cuerpo.puestoId));
+  const hayPuestos = aplicado !== null && listarPuestos(db).some((p) => p.referencia?.regimen === aplicado);
+  if (!vacio(cuerpo.puestoId)) {
+    if (!puesto) errores.push("El puesto no existe.");
+    else if (aplicado && puesto.referencia && puesto.referencia.regimen !== aplicado) {
+      errores.push(`El puesto «${puesto.nombre}» es de la escala ${puesto.referencia.regimen}, no de ${aplicado}.`);
+    } else puestoId = puesto.id;
+  } else if (hayPuestos) {
+    errores.push("Elige el puesto del orgánico: de él sale la función y el nivel salarial de referencia.");
+  }
+
+  // Grado de la escala salarial: si el régimen que se aplica tiene escala, el grado es obligatorio
+  // y debe ser de esa escala; si hay puesto, se propone el de su referencia y se avisa si es otro. El sueldo sale de la tabla.
+  let escalaId: number | null = null;
+  const pedido = vacio(cuerpo.escalaId) && puestoId !== null ? puesto?.escalaId : cuerpo.escalaId;
+  const hayPedido = !vacio(pedido);
+  const grado = hayPedido ? buscarGrado(db, Number(pedido)) : undefined;
+  if (hayPedido) {
     if (!grado) errores.push("El grado de la escala salarial no existe.");
     else if (aplicado && grado.regimen !== aplicado) {
       errores.push(`El grado ${grado.grado} es de la escala ${grado.regimen}, no de ${aplicado}.`);
-    } else escalaId = grado.id;
+    } else {
+      escalaId = grado.id;
+      if (puesto && grado.id !== puesto.escalaId) {
+        avisos.push(`Aviso: el nivel ${grado.denominacion} difiere de la referencia del puesto «${puesto.nombre}».`);
+      }
+    }
+  } else if (aplicado && listarEscala(db, aplicado).length > 0) {
+    errores.push(`Elige un grado de la escala salarial ${aplicado}: el sueldo se toma de la tabla.`);
   }
 
   // Opciones de pago: vacío = lo que diga el régimen.
@@ -103,11 +133,17 @@ function validar(
     else {
       // El SBU del año en curso sale de la base, no de una constante.
       const { parametros } = parametrosDelAnio(db, new Date().getFullYear());
-      if (sueldoBase < parametros.sbu) {
-        avisos.push(`Aviso: el sueldo es menor al SBU ${parametros.anio} ($${parametros.sbu}).`);
+      if (grado && escalaId !== null && grado.esMinimo && sueldoBase < grado.rmu) {
+        errores.push(
+          `No se puede registrar al empleado: el sueldo ($${sueldoBase}) es menor al mínimo del nivel ${grado.denominacion} ($${grado.rmu}).`,
+        );
+      } else if (sueldoBase < parametros.sbu) {
+        errores.push(
+          `No se puede registrar al empleado: el sueldo ($${sueldoBase}) es menor al salario básico unificado ${parametros.anio} ($${parametros.sbu}).`,
+        );
       }
-      if (grado && escalaId !== null && sueldoBase !== grado.rmu) {
-        avisos.push(`Aviso: el sueldo ($${sueldoBase}) difiere de la RMU del grado ${grado.grado} ($${grado.rmu}).`);
+      if (grado && escalaId !== null && !grado.esMinimo && sueldoBase !== grado.rmu) {
+        errores.push(`El sueldo ($${sueldoBase}) debe ser la RMU del grado ${grado.grado} ($${grado.rmu}).`);
       }
     }
   } catch (error) {
@@ -117,7 +153,7 @@ function validar(
   if (errores.length) throw new ErrorApi(400, errores);
   return {
     datos: {
-      cedula, nombres, cargo, sueldoBase, fechaIngreso, tipoContrato, regimen, categoriaLoep, escalaId,
+      cedula, nombres, cargo, sueldoBase, fechaIngreso, tipoContrato, regimen, categoriaLoep, escalaId, puestoId,
       pagoDecimoTercero, pagoDecimoCuarto, pagoFondosReserva, recibeHorasExtras,
     },
     avisos,
@@ -156,20 +192,7 @@ export function rutasEmpleados(db: DatabaseSync): Router {
   });
 
   router.post("/demo", (_req, res) => {
-    let nuevos = 0;
-    for (const e of EMPLEADOS_DEMO) {
-      const r = ejecutar(
-        db,
-        `INSERT OR IGNORE INTO empleados (cedula, nombres, cargo, sueldo_base, fecha_ingreso,
-         tipo_contrato, regimen, categoria_loep, escala_id)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?,
-                 (SELECT id FROM escala_salarial WHERE regimen = ? AND grado = ?))`,
-        e.cedula, e.nombres, e.cargo, e.sueldoBase, e.fechaIngreso, e.tipoContrato, e.regimen, e.categoriaLoep,
-        "LOSEP", e.escalaGrado,
-      );
-      nuevos += Number(r.changes);
-    }
-    res.status(201).json({ agregados: nuevos });
+    res.status(201).json({ agregados: cargarEmpleadosDemo(db) });
   });
 
   router.get("/:id", (req, res) => {
@@ -183,10 +206,10 @@ export function rutasEmpleados(db: DatabaseSync): Router {
       const r = ejecutar(
         db,
         `INSERT INTO empleados (cedula, nombres, cargo, sueldo_base, fecha_ingreso, tipo_contrato,
-         regimen, categoria_loep, escala_id, pago_decimo_tercero, pago_decimo_cuarto,
-         pago_fondos_reserva, recibe_horas_extras) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+         regimen, categoria_loep, escala_id, puesto_id, pago_decimo_tercero, pago_decimo_cuarto,
+         pago_fondos_reserva, recibe_horas_extras) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         datos.cedula, datos.nombres, datos.cargo, datos.sueldoBase, datos.fechaIngreso,
-        datos.tipoContrato, datos.regimen, datos.categoriaLoep, datos.escalaId,
+        datos.tipoContrato, datos.regimen, datos.categoriaLoep, datos.escalaId, datos.puestoId,
         datos.pagoDecimoTercero, datos.pagoDecimoCuarto, datos.pagoFondosReserva,
         datos.recibeHorasExtras === null ? null : Number(datos.recibeHorasExtras),
       );
@@ -202,14 +225,15 @@ export function rutasEmpleados(db: DatabaseSync): Router {
       ejecutar(
         db,
         `UPDATE empleados SET cedula = ?, nombres = ?, cargo = ?, sueldo_base = ?,
-         fecha_ingreso = ?, tipo_contrato = ?, regimen = ?, categoria_loep = ?, escala_id = ?,
+         fecha_ingreso = ?, tipo_contrato = ?, regimen = ?, categoria_loep = ?, escala_id = ?, puesto_id = ?,
          pago_decimo_tercero = ?, pago_decimo_cuarto = ?, pago_fondos_reserva = ?, recibe_horas_extras = ?
          WHERE id = ?`,
         datos.cedula, datos.nombres, datos.cargo, datos.sueldoBase, datos.fechaIngreso,
-        datos.tipoContrato, datos.regimen, datos.categoriaLoep, datos.escalaId,
+        datos.tipoContrato, datos.regimen, datos.categoriaLoep, datos.escalaId, datos.puestoId,
         datos.pagoDecimoTercero, datos.pagoDecimoCuarto, datos.pagoFondosReserva,
         datos.recibeHorasExtras === null ? null : Number(datos.recibeHorasExtras), actual.id,
       );
+      soltarResponsable(db, Number(actual.id), datos.puestoId); // si cambió de puesto, ya no lo encabeza
     });
     res.json({ ...aApi(buscar(req.params.id)), avisos });
   });
@@ -217,6 +241,7 @@ export function rutasEmpleados(db: DatabaseSync): Router {
   router.patch("/:id/estado", (req, res) => {
     const actual = buscar(req.params.id);
     ejecutar(db, "UPDATE empleados SET activo = 1 - activo WHERE id = ?", actual.id);
+    if (actual.activo === 1) soltarResponsable(db, Number(actual.id), null); // quien se desactiva deja de ser responsable
     res.json(aApi(buscar(req.params.id)));
   });
 

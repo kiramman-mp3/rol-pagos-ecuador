@@ -36,9 +36,9 @@ const PARAMETROS = {
 };
 
 const GRADOS = [
-  { id: 1, regimen: 'LOSEP', grado: 1, denominacion: 'Servidor Público de Servicios 1', rmu: 527, fuente: 'ecu11.com (por confirmar)' },
-  { id: 2, regimen: 'LOSEP', grado: 2, denominacion: 'Servidor Público de Servicios 2', rmu: 553, fuente: 'ecu11.com (por confirmar)' },
-  { id: 9, regimen: 'CODIGO_TRABAJO', grado: 1, denominacion: 'Operario', rmu: 500, fuente: '' },
+  { id: 1, regimen: 'LOSEP', grado: 1, denominacion: 'Servidor Público de Servicios 1', rmu: 527, rmuMax: null, esMinimo: false, fuente: 'ecu11.com (por confirmar)' },
+  { id: 2, regimen: 'LOSEP', grado: 2, denominacion: 'Servidor Público de Servicios 2', rmu: 553, rmuMax: null, esMinimo: false, fuente: 'ecu11.com (por confirmar)' },
+  { id: 9, regimen: 'CODIGO_TRABAJO', grado: 1, denominacion: 'Operario', rmu: 500, rmuMax: null, esMinimo: false, fuente: '' },
 ];
 
 describe('parámetros', () => {
@@ -251,6 +251,25 @@ describe('parámetros', () => {
       expect(opciones).toEqual(['Código del Trabajo', 'LOSEP']);
     });
 
+    it('agrega un nivel de mínimo con su tope', async () => {
+      const { fixture, el } = await abrir();
+      escribir(el, '#grado-numero', '4');
+      escribir(el, '#grado-puesto', 'Nivel nuevo');
+      escribir(el, '#grado-rmu', '490');
+      escribir(el, '#grado-rmu-max', '600');
+      escribir(el, '#grado-minimo', 'si');
+      fixture.detectChanges();
+
+      el.querySelector('form')!.dispatchEvent(new Event('submit'));
+      const envio = http.expectOne('/api/escala');
+      expect(envio.request.body).toEqual({
+        regimen: 'LOSEP', grado: 4, denominacion: 'Nivel nuevo', rmu: 490, rmuMax: 600, esMinimo: true, fuente: '',
+      });
+      envio.flush({ ...GRADOS[0], id: 4 });
+      await new Promise((resolver) => setTimeout(resolver));
+      http.match('/api/escala').forEach((r) => r.flush(GRADOS));
+    });
+
     it('agrega un grado al régimen elegido', async () => {
       const { fixture, el } = await abrir();
       escribir(el, '#grado-numero', '3');
@@ -262,7 +281,7 @@ describe('parámetros', () => {
       const envio = http.expectOne('/api/escala');
       expect(envio.request.method).toBe('POST');
       expect(envio.request.body).toEqual({
-        regimen: 'LOSEP', grado: 3, denominacion: 'Servidor Público de Apoyo 1', rmu: 585, fuente: '',
+        regimen: 'LOSEP', grado: 3, denominacion: 'Servidor Público de Apoyo 1', rmu: 585, rmuMax: null, esMinimo: false, fuente: '',
       });
       envio.flush({ ...GRADOS[0], id: 3 });
       await new Promise((resolver) => setTimeout(resolver));

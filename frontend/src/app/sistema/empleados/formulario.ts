@@ -8,7 +8,10 @@ import { firstValueFrom } from 'rxjs';
 import { Api, ParametrosLey, valorSeguro } from '../../core/api';
 import { Avisos } from '../../core/avisos';
 import { DineroPipe } from '../../core/dinero.pipe';
-import type { DatosEmpleado, Empleado, Grado } from '../../core/modelos';
+import type { DatosEmpleado, Empleado, Grado, Puesto } from '../../core/modelos';
+
+/** Familia de un nivel de la tabla: la letra con la que empieza («B» para «B2: Supervisión técnica»). */
+const familiaDeNivel = (g: Grado) => g.denominacion.trim().charAt(0).toUpperCase();
 
 /** Alta y edición: la ruta /empleados/:id/editar entrega `id`; /empleados/nuevo no. */
 @Component({
@@ -68,24 +71,76 @@ import type { DatosEmpleado, Empleado, Grado } from '../../core/modelos';
               <span class="ayuda">La categoría decide qué reglas se aplican en el rol.</span>
             </div>
           }
-          @if (grados().length) {
-            <div class="campo c3">
-              <label for="escalaId">Grado de la escala salarial</label>
-              <select class="entrada" id="escalaId" formControlName="escalaId"
-                      (change)="elegirGrado($any($event.target).value)">
-                <option value="">Sin grado: el sueldo se escribe a mano</option>
-                @for (g of grados(); track g.id) {
-                  <option [value]="g.id">Grado {{ g.grado }}: {{ g.denominacion }} ({{ g.rmu | dinero }})</option>
+          @if (usaPuestos()) {
+            <div class="campo c6">
+              <label for="puestoId">Puesto en el orgánico</label>
+              <select class="entrada" id="puestoId" formControlName="puestoId"
+                      (change)="elegirPuesto($any($event.target).value)">
+                <option value="">Elige un puesto</option>
+                @for (p of puestosDelRegimen(); track p.id) {
+                  <option [value]="p.id">{{ p.nombre }}</option>
                 }
               </select>
-              <span class="ayuda">Al elegir un grado se llena el sueldo con su remuneración. Puedes cambiarlo.</span>
+              @if (puestoElegido(); as p) {
+                <dl class="ficha-puesto">
+                  <dt>Función</dt><dd>{{ p.funcion }}</dd>
+                  <dt>Responsabilidad</dt><dd>{{ p.responsabilidad }}</dd>
+                  <dt>Sector económico</dt><dd>{{ p.sector }}</dd>
+                  <dt>Referencia salarial</dt>
+                  <dd>
+                    @if (p.referencia; as r) {
+                      {{ r.denominacion }}: mínimo {{ r.rmu | dinero }}
+                      @if (r.rmuMax) { (según la rama, hasta {{ r.rmuMax | dinero }}) }
+                    }
+                  </dd>
+                </dl>
+              } @else {
+                <span class="ayuda">
+                  Primero se identifica el puesto: de él salen la función, la responsabilidad, el sector y el
+                  nivel salarial de referencia. Después se asigna el sueldo.
+                </span>
+              }
             </div>
+          }
+          @if (exigeGrado()) {
+            <div class="campo c6">
+              <label for="escalaId">{{ usaPuestos() ? 'Nivel que le toca (tabla salarial)' : 'Grado de la escala salarial' }}</label>
+              <select class="entrada" id="escalaId" formControlName="escalaId"
+                      (change)="elegirGrado($any($event.target).value)">
+                <option value="">Elige un grado de la tabla</option>
+                @for (g of opcionesGrado(); track g.id) {
+                  <option [value]="g.id">
+                    Grado {{ g.grado }}: {{ g.denominacion }}
+                    ({{ g.esMinimo ? 'mínimo ' : '' }}{{ g.rmu | dinero }}{{ g.rmuMax ? ' a ' + (g.rmuMax | dinero) : '' }})
+                  </option>
+                }
+              </select>
+              <span class="ayuda">
+                @if (usaPuestos()) {
+                  Viene del puesto, pero puedes elegir otro nivel de la tabla si al trabajador le toca uno distinto.
+                } @else {
+                  El grado fija el sueldo que se paga, según la tabla.
+                }
+              </span>
+            </div>
+          }
+          @if (gradoElegido(); as g) {
+            <p class="ayuda c6">
+              @if (g.esMinimo) {
+                El sueldo no puede ser menor a {{ g.rmu | dinero }}, el mínimo de este nivel. Puede ser mayor.
+              } @else {
+                El sueldo es la remuneración del grado, según la tabla.
+              }
+            </p>
           }
           <div class="campo c3">
             <label for="sueldoBase">Sueldo base (USD)</label>
-            <input class="entrada num" id="sueldoBase" type="number" step="0.01" min="0.01"
-                   formControlName="sueldoBase" />
-            @if (parametros(); as p) {
+            <input class="entrada num" id="sueldoBase" type="number" step="0.01"
+                   formControlName="sueldoBase" [readOnly]="exigeGrado() && !gradoElegido()?.esMinimo"
+                   [min]="gradoElegido()?.esMinimo ? gradoElegido()!.rmu : 0.01" />
+            @if (sueldoBajo(); as motivo) {
+              <span class="error-campo" role="alert">{{ motivo }}</span>
+            } @else if (parametros(); as p) {
               <span class="ayuda">El sueldo básico unificado de {{ p.anio }} es {{ p.sbu | dinero }}.</span>
             }
           </div>
@@ -149,6 +204,7 @@ export class FormularioEmpleado {
     regimen: ['CODIGO_TRABAJO', Validators.required],
     categoriaLoep: [''],
     escalaId: [''],
+    puestoId: [''],
     pagoDecimoTercero: [''],
     pagoDecimoCuarto: [''],
     pagoFondosReserva: [''],
@@ -181,11 +237,66 @@ export class FormularioEmpleado {
     return this.categoriaSeleccionada() === 'obrero' ? r.regimenObrero : r.regimenServidor;
   });
 
+  private readonly puestos = valorSeguro(httpResource<Puesto[]>(() => '/api/puestos'));
+  /** Puestos cuya referencia salarial es la escala del régimen que se aplica. */
+  protected readonly puestosDelRegimen = computed(() => {
+    const aplicado = this.regimenQueSeAplica();
+    return (this.puestos() ?? []).filter((p) => p.referencia?.regimen === aplicado);
+  });
+  protected readonly usaPuestos = computed(() => this.puestosDelRegimen().length > 0);
+  private readonly puestoId = toSignal(this.form.controls.puestoId.valueChanges, {
+    initialValue: this.form.controls.puestoId.value,
+  });
+  protected readonly puestoElegido = computed(() =>
+    this.puestosDelRegimen().find((p) => String(p.id) === this.puestoId()),
+  );
+
+  /**
+   * Los grados del select. Sin puestos, todos los de la escala. Con puestos, solo los de la misma familia
+   * de niveles que la referencia del puesto elegido (si es B3: B1, B2 y B3), y ninguno mientras no haya puesto.
+   * El grado que ya tiene el empleado siempre se ofrece, para no perderlo al editar.
+   */
+  protected readonly opcionesGrado = computed(() => {
+    const todos = this.grados();
+    if (!this.usaPuestos()) return todos;
+    const referencia = this.puestoElegido()?.referencia;
+    const actual = this.gradoId();
+    const familia = referencia ? familiaDeNivel(referencia) : null;
+    return todos.filter((g) => (familia !== null && familiaDeNivel(g) === familia) || String(g.id) === actual);
+  });
+
   private readonly escala = valorSeguro(httpResource<Grado[]>(() => '/api/escala'));
   protected readonly grados = computed(() => {
     const aplicado = this.regimenQueSeAplica();
     return (this.escala() ?? []).filter((g) => g.regimen === aplicado);
   });
+
+  private readonly gradoId = toSignal(this.form.controls.escalaId.valueChanges, {
+    initialValue: this.form.controls.escalaId.value,
+  });
+  protected readonly gradoElegido = computed(() => this.grados().find((g) => String(g.id) === this.gradoId()));
+
+  private readonly sueldo = toSignal(this.form.controls.sueldoBase.valueChanges, {
+    initialValue: this.form.controls.sueldoBase.value,
+  });
+
+  /** Por qué el sueldo escrito no se puede registrar (menor al mínimo del nivel o al SBU), o null si está bien. */
+  protected readonly sueldoBajo = computed(() => {
+    const sueldo = this.sueldo();
+    if (sueldo === null || sueldo === undefined || sueldo <= 0) return null;
+    const nivel = this.gradoElegido();
+    if (nivel?.esMinimo && sueldo < nivel.rmu) {
+      return `No se puede registrar al empleado: el sueldo (${sueldo} USD) es menor al mínimo del nivel ${nivel.denominacion} (${nivel.rmu} USD).`;
+    }
+    const sbu = this.parametros()?.sbu;
+    if (sbu !== undefined && sueldo < sbu) {
+      return `No se puede registrar al empleado: el sueldo (${sueldo} USD) es menor al salario básico unificado (${sbu} USD).`;
+    }
+    return null;
+  });
+
+  /** Si el régimen aplicado tiene escala, el grado es obligatorio y fija el sueldo. */
+  protected readonly exigeGrado = computed(() => this.grados().length > 0);
 
   private readonly actual = valorSeguro(
     httpResource<Empleado>(() => (this.id() ? `/api/empleados/${this.id()}` : undefined)),
@@ -200,6 +311,7 @@ export class FormularioEmpleado {
           ...e,
           categoriaLoep: e.categoriaLoep ?? '',
           escalaId: e.escalaId ? String(e.escalaId) : '',
+          puestoId: e.puestoId ? String(e.puestoId) : '',
           pagoDecimoTercero: e.pagoDecimoTercero ?? '',
           pagoDecimoCuarto: e.pagoDecimoCuarto ?? '',
           pagoFondosReserva: e.pagoFondosReserva ?? '',
@@ -208,42 +320,104 @@ export class FormularioEmpleado {
       }
     });
 
+    // Si el régimen cambia y el puesto elegido ya no es de su orgánico, se quita (con su grado, sueldo y cargo).
+    effect(() => {
+      const puestos = this.puestosDelRegimen();
+      if (!this.puestos()) return;
+      const actual = this.form.controls.puestoId.value;
+      if (actual && !puestos.some((p) => String(p.id) === actual)) this.form.controls.puestoId.setValue('');
+    });
+
     // Si el régimen cambia y el grado elegido ya no pertenece a su escala, se quita.
     effect(() => {
       const grados = this.grados();
       if (!this.escala()) return;
       const actual = this.form.controls.escalaId.value;
-      if (actual && !grados.some((g) => String(g.id) === actual)) this.form.controls.escalaId.setValue('');
+      if (actual && !grados.some((g) => String(g.id) === actual)) {
+        this.form.controls.escalaId.setValue('');
+        this.form.controls.sueldoBase.setValue(null); // el sueldo venía del grado que se quitó
+        this.soltarCargoPropuesto();
+      }
     });
   }
 
   /** Elegir un grado propone su remuneración como sueldo y su denominación como cargo. */
   protected elegirGrado(valor: string) {
     const grado = this.grados().find((g) => String(g.id) === valor);
-    if (!grado) return;
+    if (!grado) {
+      this.form.controls.sueldoBase.setValue(null);
+      if (!this.usaPuestos()) this.soltarCargoPropuesto();
+      return;
+    }
     this.form.controls.sueldoBase.setValue(grado.rmu);
-    if (!this.form.controls.cargo.value.trim()) this.form.controls.cargo.setValue(grado.denominacion);
+    // Con puestos, el cargo es el del puesto: el nivel solo cambia el sueldo.
+    if (!this.usaPuestos()) this.proponerCargo(grado.denominacion);
+  }
+
+  /** El cargo se reemplaza solo si está vacío o si es el que propuso la elección anterior: uno escrito a mano se respeta. */
+  private proponerCargo(texto: string) {
+    const cargo = this.form.controls.cargo;
+    if (!cargo.value.trim() || cargo.value === this.cargoPropuesto) cargo.setValue(texto);
+    this.cargoPropuesto = texto;
+  }
+
+  /** Elegir un puesto fija el grado de su referencia, propone el sueldo mínimo y el nombre como cargo. */
+  protected elegirPuesto(valor: string) {
+    const puesto = this.puestosDelRegimen().find((p) => String(p.id) === valor);
+    if (!puesto?.referencia) {
+      this.form.controls.escalaId.setValue('');
+      this.form.controls.sueldoBase.setValue(null);
+      this.soltarCargoPropuesto();
+      return;
+    }
+    this.form.controls.escalaId.setValue(String(puesto.referencia.id));
+    this.form.controls.sueldoBase.setValue(puesto.referencia.rmu);
+    this.proponerCargo(puesto.nombre);
+  }
+
+  /** Denominación que el último grado puso en el cargo, para saber si el usuario la cambió. */
+  private cargoPropuesto = '';
+
+  /** Si el grado se quita, el cargo que él había propuesto se quita también. */
+  private soltarCargoPropuesto() {
+    if (this.form.controls.cargo.value === this.cargoPropuesto) this.form.controls.cargo.setValue('');
+    this.cargoPropuesto = '';
   }
 
   protected async guardar() {
     this.avisos.limpiar();
-    if (this.form.invalid) {
-      this.form.markAllAsTouched();
-      this.avisos.error('Completa todos los campos antes de guardar.');
-      return;
-    }
     const {
-      categoriaLoep, escalaId, pagoDecimoTercero, pagoDecimoCuarto, pagoFondosReserva, recibeHorasExtras,
+      categoriaLoep, escalaId, puestoId, pagoDecimoTercero, pagoDecimoCuarto, pagoFondosReserva, recibeHorasExtras,
       ...resto
     } = this.form.getRawValue();
     if (this.esMixto() && !categoriaLoep) {
       this.avisos.error('Elige si el empleado es servidor u obrero.');
       return;
     }
+    if (this.usaPuestos() && !puestoId) {
+      this.avisos.error('Elige el puesto del orgánico: de él sale el nivel salarial de referencia.');
+      return;
+    }
+    if (this.exigeGrado() && !escalaId) {
+      this.avisos.error('Elige un grado de la escala salarial: el sueldo sale de la tabla.');
+      return;
+    }
+    const motivo = this.sueldoBajo();
+    if (motivo) {
+      this.avisos.error(motivo);
+      window.scrollTo({ top: 0 });
+      return;
+    }
+    if (this.form.invalid) {
+      this.form.markAllAsTouched();
+      this.avisos.error('Completa todos los campos antes de guardar.');
+      return;
+    }
     const datos = {
       ...resto,
       categoriaLoep: this.esMixto() ? categoriaLoep : null,
       escalaId: escalaId ? Number(escalaId) : null,
+      puestoId: this.usaPuestos() && puestoId ? Number(puestoId) : null,
       pagoDecimoTercero: pagoDecimoTercero || null,
       pagoDecimoCuarto: pagoDecimoCuarto || null,
       pagoFondosReserva: pagoFondosReserva || null,

@@ -1,13 +1,13 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
-import { EMPLEADO, iniciar } from "./ayuda.ts";
+import { EMPLEADO, iniciar, cargarEmpleadosDePrueba } from "./ayuda.ts";
 import type { Cliente } from "./ayuda.ts";
 
 async function conDemo(prueba: (api: Cliente) => Promise<void>) {
   const api = await iniciar();
   try {
-    await api.post("/api/empleados/demo");
+    await cargarEmpleadosDePrueba(api);
     await prueba(api);
   } finally {
     api.cerrar();
@@ -120,7 +120,10 @@ describe("empleados y régimen", () => {
       const por_defecto = await api.post("/api/empleados", EMPLEADO);
       assert.equal(por_defecto.json.regimen, "CODIGO_TRABAJO");
       assert.equal(por_defecto.json.categoriaLoep, null);
-      const losep = await api.post("/api/empleados", { ...EMPLEADO, cedula: "1702345677", regimen: "LOSEP" });
+      const grado = (await api.get("/api/escala?regimen=LOSEP")).json[4];
+      const losep = await api.post("/api/empleados", {
+        ...EMPLEADO, puestoId: null, cedula: "1702345677", regimen: "LOSEP", sueldoBase: grado.rmu, escalaId: grado.id,
+      });
       assert.equal(losep.json.regimen, "LOSEP");
     } finally {
       api.cerrar();
@@ -135,8 +138,10 @@ describe("empleados y régimen", () => {
       assert.match(sin.json.errores[0], /servidor u obrero/);
       const con = await api.post("/api/empleados", { ...EMPLEADO, regimen: "LOEP", categoriaLoep: "obrero" });
       assert.equal(con.json.categoriaLoep, "obrero");
+      const grado = (await api.get("/api/escala?regimen=LOSEP")).json[4];
       const ignorada = await api.post("/api/empleados", {
-        ...EMPLEADO, cedula: "1702345677", regimen: "LOSEP", categoriaLoep: "obrero",
+        ...EMPLEADO, puestoId: null, cedula: "1702345677", regimen: "LOSEP", categoriaLoep: "obrero",
+        sueldoBase: grado.rmu, escalaId: grado.id,
       });
       assert.equal(ignorada.json.categoriaLoep, null);
     } finally {
@@ -181,10 +186,10 @@ describe("roles según el régimen", () => {
   it("LOEP servidor sigue la LOSEP y LOEP obrero el Código del Trabajo", () =>
     conDemo(async (api) => {
       const { id } = (await generar(api)).json;
-      const servidora = await detalleDe(api, id, 5); // Daniela, $2600
+      const servidora = await detalleDe(api, id, 5); // Daniela, $2670 (grado 19)
       assert.equal(servidora.regimen, "LOEP");
       assert.equal(servidora.regimenAplicado, "LOSEP");
-      assert.equal(servidora.aporteIess, 297.7); // 2600 * 11.45%
+      assert.equal(servidora.aporteIess, 305.72); // 2670 * 11.45% = 305.715
 
       const obrero = await detalleDe(api, id, 6); // Pedro, $482, ingresó el 16 de octubre
       assert.equal(obrero.regimen, "LOEP");

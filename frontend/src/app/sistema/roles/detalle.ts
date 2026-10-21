@@ -1,6 +1,6 @@
 import { httpResource } from '@angular/common/http';
 import { PercentPipe } from '@angular/common';
-import { Component, computed, inject, input } from '@angular/core';
+import { Component, computed, inject, input, signal } from '@angular/core';
 import { Router, RouterLink } from '@angular/router';
 import { firstValueFrom } from 'rxjs';
 
@@ -13,24 +13,50 @@ import type { Modalidad, PlanillaIess, RolCompleto, RolDetalle } from '../../cor
 @Component({
   selector: 'app-detalle-rol',
   imports: [RouterLink, DineroPipe, PercentPipe],
+  styles: `
+    .volver { margin-left: -.5rem; }
+    h1 .insignia { vertical-align: middle; margin-left: .4rem; font-family: var(--cuerpo); letter-spacing: 0; }
+    .saltos { display: flex; gap: .5rem; flex-wrap: wrap; margin: -.5rem 0 1.25rem; }
+    .saltos a {
+      font-weight: 700; font-size: .875rem; text-decoration: none; color: var(--noche);
+      background: var(--hoja); border: 1.5px solid var(--linea); border-radius: 999px; padding: .4rem .9rem;
+    }
+    .saltos a:hover { border-color: var(--marca); background: var(--ingresos-fondo); }
+    .confirmar { display: inline-flex; align-items: center; gap: .25rem; font-size: .9rem; font-weight: 600; color: var(--descuentos); }
+  `,
   template: `
     @if (datos(); as r) {
       <div class="encabezado">
         <div>
-          <h1>{{ nombreMes() }} {{ r.anio }}</h1>
+          <a class="boton-texto volver no-imprimir" routerLink="/sistema/roles">‹ Roles de pago</a>
+          <h1>{{ nombreMes() }} {{ r.anio }} <span class="insignia insignia-neto no-imprimir">Rol generado</span></h1>
           <p class="apoyo">
             {{ parametros()?.empresa?.nombre }}, RUC {{ parametros()?.empresa?.ruc }}.
-            Generado el {{ r.generadoEn.slice(0, 10) }} a las {{ r.generadoEn.slice(11, 16) }}.
+            Generado el {{ fechaGeneracion(r.generadoEn) }}.
           </p>
         </div>
         <div class="acciones no-imprimir">
-          <a class="boton boton-claro" [routerLink]="['/sistema/roles/novedades', r.anio, r.mes]">Recalcular</a>
-          <a class="boton boton-claro" [href]="'/api/roles/' + r.id + '/csv'" download>Descargar CSV</a>
+          <a class="boton boton-sol" [href]="'/api/roles/' + r.id + '/csv'" download>Descargar CSV</a>
           <a class="boton boton-claro" [href]="'/api/roles/' + r.id + '/iess.csv'" download>Aportes para el IESS</a>
           <button class="boton boton-claro" type="button" (click)="imprimir()">Imprimir</button>
-          <button class="boton-texto boton-peligro" type="button" (click)="eliminar(r)">Eliminar rol</button>
+          <a class="boton boton-claro" [routerLink]="['/sistema/roles/novedades', r.anio, r.mes]">Recalcular</a>
+          @if (confirmandoEliminar()) {
+            <span class="confirmar" role="alert">
+              ¿Eliminar el rol de {{ nombreMes() }}?
+              <button class="boton-texto boton-peligro" type="button" (click)="eliminar(r)">Sí, eliminar</button>
+              <button class="boton-texto" type="button" (click)="confirmandoEliminar.set(false)">No</button>
+            </span>
+          } @else {
+            <button class="boton-texto boton-peligro" type="button" (click)="confirmandoEliminar.set(true)">Eliminar rol</button>
+          }
         </div>
       </div>
+
+      <nav class="saltos no-imprimir" aria-label="Secciones del rol">
+        <a href="#titulo-planilla" (click)="ir($event, 'titulo-planilla')">Lo que recibe cada persona</a>
+        <a href="#titulo-provisiones" (click)="ir($event, 'titulo-provisiones')">Costo empleador</a>
+        <a href="#titulo-iess" (click)="ir($event, 'titulo-iess')">Conciliación con el IESS</a>
+      </nav>
 
       <div class="franja">
         <div class="ecuacion" role="group" aria-label="Del ingreso al neto">
@@ -79,16 +105,16 @@ import type { Modalidad, PlanillaIess, RolCompleto, RolDetalle } from '../../cor
                 <th rowspan="2">Empleado</th>
                 <th colspan="5" class="g-ingresos t-ingresos corte">Ingresos</th>
                 <th colspan="4" class="g-descuentos t-descuentos corte">Descuentos</th>
-                <th rowspan="2" class="num g-neto c-neto corte">Neto a recibir</th>
+                <th rowspan="2" class="num g-neto c-neto corte"><span class="th-largo">Neto a recibir</span><span class="th-corto" aria-hidden="true">Neto</span></th>
               </tr>
               <tr>
                 <th class="num corte">Sueldo</th>
-                <th class="num">Horas extra</th>
+                <th class="num"><span class="th-largo">Horas extra</span><span class="th-corto" aria-hidden="true">H. extra</span></th>
                 <th class="num">Comisiones</th>
-                <th class="num" title="Décimos y fondos de reserva que se pagan dentro del rol">Décimos y fondos</th>
+                <th class="num" title="Décimos y fondos de reserva que se pagan dentro del rol"><span class="th-largo">Décimos y fondos</span><span class="th-corto" aria-hidden="true">Déc. y fondos</span></th>
                 <th class="num">Total</th>
-                <th class="num corte">Aporte IESS</th>
-                <th class="num">Impuesto a la renta</th>
+                <th class="num corte"><span class="th-largo">Aporte IESS</span><span class="th-corto" aria-hidden="true">IESS</span></th>
+                <th class="num"><span class="th-largo">Impuesto a la renta</span><span class="th-corto" aria-hidden="true">IR</span></th>
                 <th class="num">Otros</th>
                 <th class="num">Total</th>
               </tr>
@@ -151,13 +177,13 @@ import type { Modalidad, PlanillaIess, RolCompleto, RolDetalle } from '../../cor
             <thead>
               <tr>
                 <th class="g-provision">Empleado</th>
-                <th class="num g-provision">Décimo tercero</th>
-                <th class="num g-provision">Décimo cuarto</th>
+                <th class="num g-provision"><span class="th-largo">Décimo tercero</span><span class="th-corto" aria-hidden="true">13.º</span></th>
+                <th class="num g-provision"><span class="th-largo">Décimo cuarto</span><span class="th-corto" aria-hidden="true">14.º</span></th>
                 <th class="num g-provision">Vacaciones</th>
-                <th class="num g-provision">Fondos de reserva</th>
-                <th class="num g-provision">Aporte patronal</th>
-                <th class="num g-provision">Total provisiones</th>
-                <th class="num">Costo empleador</th>
+                <th class="num g-provision"><span class="th-largo">Fondos de reserva</span><span class="th-corto" aria-hidden="true">Fondos</span></th>
+                <th class="num g-provision"><span class="th-largo">Aporte patronal</span><span class="th-corto" aria-hidden="true">Patronal</span></th>
+                <th class="num g-provision"><span class="th-largo">Total provisiones</span><span class="th-corto" aria-hidden="true">Total</span></th>
+                <th class="num"><span class="th-largo">Costo empleador</span><span class="th-corto" aria-hidden="true">Costo</span></th>
               </tr>
             </thead>
             <tbody>
@@ -229,12 +255,12 @@ import type { Modalidad, PlanillaIess, RolCompleto, RolDetalle } from '../../cor
               <thead>
                 <tr>
                   <th>Empleado</th>
-                  <th class="num">Materia gravada</th>
-                  <th class="num">Aporte personal</th>
-                  <th class="num">Aporte patronal</th>
-                  <th class="num">Total aportes</th>
-                  <th class="num" title="Fondos de reserva que el trabajador acumula: se depositan en el IESS">Fondos a depositar</th>
-                  <th class="num" title="Fondos de reserva que ya se pagaron en el rol">Fondos pagados en el rol</th>
+                  <th class="num"><span class="th-largo">Materia gravada</span><span class="th-corto" aria-hidden="true">Gravada</span></th>
+                  <th class="num"><span class="th-largo">Aporte personal</span><span class="th-corto" aria-hidden="true">Personal</span></th>
+                  <th class="num"><span class="th-largo">Aporte patronal</span><span class="th-corto" aria-hidden="true">Patronal</span></th>
+                  <th class="num"><span class="th-largo">Total aportes</span><span class="th-corto" aria-hidden="true">Total</span></th>
+                  <th class="num" title="Fondos de reserva que el trabajador acumula: se depositan en el IESS"><span class="th-largo">Fondos a depositar</span><span class="th-corto" aria-hidden="true">A depositar</span></th>
+                  <th class="num" title="Fondos de reserva que ya se pagaron en el rol"><span class="th-largo">Fondos pagados en el rol</span><span class="th-corto" aria-hidden="true">Pagados en rol</span></th>
                 </tr>
               </thead>
               <tbody>
@@ -297,6 +323,8 @@ export class DetalleRol {
   protected readonly datos = valorSeguro(this.rol);
   protected readonly iess = valorSeguro(httpResource<PlanillaIess>(() => `/api/roles/${this.id()}/iess`));
 
+  protected readonly confirmandoEliminar = signal(false);
+
   protected readonly nombreMes = computed(
     () => this.parametros()?.meses[(this.datos()?.mes ?? 1) - 1] ?? '',
   );
@@ -336,12 +364,24 @@ export class DetalleRol {
     ]);
   }
 
+  /** 2026-10-20T23:33:17 -> 20 de octubre de 2026, 23:33 */
+  protected fechaGeneracion(iso: string): string {
+    const f = new Date(iso);
+    if (Number.isNaN(f.getTime())) return iso;
+    const dia = f.toLocaleDateString('es-EC', { day: 'numeric', month: 'long', year: 'numeric' });
+    return `${dia}, ${iso.slice(11, 16)}`;
+  }
+
+  protected ir(evento: Event, id: string) {
+    evento.preventDefault();
+    document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+
   protected imprimir() {
     window.print();
   }
 
   protected async eliminar(r: RolCompleto) {
-    if (!confirm(`¿Eliminar el rol de ${this.nombreMes()} ${r.anio}?`)) return;
     try {
       await firstValueFrom(this.api.eliminarRol(r.id));
       this.avisos.exito('Rol eliminado.');

@@ -28,9 +28,9 @@ describe('rutas', () => {
     http.match(() => true);
   });
 
-  it('/sistema entra a la lista de empleados', async () => {
+  it('/sistema entra al inicio del mes', async () => {
     await harness.navigateByUrl('/sistema');
-    expect(TestBed.inject(Router).url).toBe('/sistema/empleados');
+    expect(TestBed.inject(Router).url).toBe('/sistema/inicio');
     http.match(() => true);
   });
 

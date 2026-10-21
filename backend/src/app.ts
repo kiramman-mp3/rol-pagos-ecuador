@@ -8,6 +8,7 @@ import { abrirBase } from "./db.ts";
 import { rutasEmpleados } from "./rutas/empleados.ts";
 import { rutasEscala } from "./rutas/escala.ts";
 import { rutasParametros } from "./rutas/parametros.ts";
+import { rutasPuestos } from "./rutas/puestos.ts";
 import { rutasRegimenes } from "./rutas/regimenes.ts";
 import { rutasRoles } from "./rutas/roles.ts";
 import { ErrorApi } from "./validaciones.ts";
@@ -29,6 +30,7 @@ export function crearApp({ rutaBase, carpetaFrontend }: Opciones) {
   app.use("/api/roles", rutasRoles(db));
   app.use("/api/regimenes", rutasRegimenes(db));
   app.use("/api/escala", rutasEscala(db));
+  app.use("/api/puestos", rutasPuestos(db));
   app.use("/api", rutasParametros(db));
   app.use("/api", (_req, _res, next) => next(new ErrorApi(404, ["Ruta no encontrada."])));
 

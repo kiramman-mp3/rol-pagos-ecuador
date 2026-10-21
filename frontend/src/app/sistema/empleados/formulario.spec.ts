@@ -3,6 +3,7 @@ import { HttpTestingController, provideHttpClientTesting } from '@angular/common
 import { TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
 
+import type { Grado, Puesto } from '../../core/modelos';
 import { FormularioEmpleado } from './formulario';
 
 const PARAMETROS = {
@@ -14,11 +15,16 @@ const PARAMETROS = {
   ],
 };
 
-const GRADOS = [
-  { id: 11, regimen: 'LOSEP', grado: 5, denominacion: 'Servidor Público de Apoyo 3', rmu: 675, fuente: '' },
-  { id: 12, regimen: 'LOSEP', grado: 7, denominacion: 'Servidor Público 1', rmu: 817, fuente: '' },
-  { id: 13, regimen: 'CODIGO_TRABAJO', grado: 1, denominacion: 'Operario', rmu: 500, fuente: '' },
+const GRADOS: Grado[] = [
+  { id: 11, regimen: 'LOSEP', grado: 5, denominacion: 'Servidor Público de Apoyo 3', rmu: 675, rmuMax: null, esMinimo: false, fuente: '' },
+  { id: 12, regimen: 'LOSEP', grado: 7, denominacion: 'Servidor Público 1', rmu: 817, rmuMax: null, esMinimo: false, fuente: '' },
 ];
+const NIVEL_MINIMO: Grado = { id: 21, regimen: 'CODIGO_TRABAJO', grado: 2, denominacion: 'B1: Supervisión general', rmu: 495, rmuMax: 842, esMinimo: true, fuente: '' };
+const PUESTO: Puesto = {
+  id: 31, nombre: 'Administrador / Contador', superiorId: null, funcion: 'Administrar los recursos.',
+  responsabilidad: 'Responde ante el gerente.', sector: 'Servicios', escalaId: 21, referencia: NIVEL_MINIMO, empleados: 0, responsable: null, ocupantes: [],
+};
+const GRADO_CODIGO: Grado = { id: 13, regimen: 'CODIGO_TRABAJO', grado: 1, denominacion: 'Operario', rmu: 500, rmuMax: null, esMinimo: false, fuente: '' };
 
 describe('FormularioEmpleado', () => {
   let http: HttpTestingController;
@@ -30,7 +36,7 @@ describe('FormularioEmpleado', () => {
     http = TestBed.inject(HttpTestingController);
   });
 
-  const abrir = async () => {
+  const abrir = async (grados = GRADOS, puestos: Puesto[] = []) => {
     const fixture = TestBed.createComponent(FormularioEmpleado);
     fixture.detectChanges();
     TestBed.tick();
@@ -41,7 +47,8 @@ describe('FormularioEmpleado', () => {
         { ...PARAMETROS.regimenes[2], regimenServidor: 'LOSEP', regimenObrero: 'CODIGO_TRABAJO' },
       ],
     });
-    http.expectOne('/api/escala').flush(GRADOS);
+    http.expectOne('/api/escala').flush(grados);
+    http.expectOne('/api/puestos').flush(puestos);
     await fixture.whenStable();
     fixture.detectChanges();
     return { fixture, el: fixture.nativeElement as HTMLElement };
@@ -91,6 +98,8 @@ describe('FormularioEmpleado', () => {
     llenarBase(el);
     escribir(el, 'regimen', 'LOSEP', 'change');
     fixture.detectChanges();
+    escribir(el, 'escalaId', '11', 'change');
+    fixture.detectChanges();
 
     el.querySelector('form')!.dispatchEvent(new Event('submit'));
     const envio = http.expectOne('/api/empleados');
@@ -117,7 +126,7 @@ describe('FormularioEmpleado', () => {
   });
 
   it('ofrece solo los grados de la escala del régimen elegido', async () => {
-    const { fixture, el } = await abrir();
+    const { fixture, el } = await abrir([...GRADOS, GRADO_CODIGO]);
     expect(el.querySelector('#escalaId option[value="13"]')).not.toBeNull(); // Código del Trabajo
     expect(el.querySelector('#escalaId option[value="11"]')).toBeNull();
 
@@ -147,6 +156,138 @@ describe('FormularioEmpleado', () => {
     expect(envio.request.body.sueldoBase).toBe(675);
   });
 
+  it('con escala, el grado es obligatorio y el sueldo no se escribe a mano', async () => {
+    const { fixture, el } = await abrir();
+    llenarBase(el);
+    escribir(el, 'regimen', 'LOSEP', 'change');
+    fixture.detectChanges();
+    expect(el.querySelector<HTMLInputElement>('#sueldoBase')!.readOnly).toBe(true);
+
+    el.querySelector('form')!.dispatchEvent(new Event('submit'));
+    http.expectNone('/api/empleados'); // falta el grado
+
+    escribir(el, 'escalaId', '12', 'change');
+    fixture.detectChanges();
+    el.querySelector('form')!.dispatchEvent(new Event('submit'));
+    expect(http.expectOne('/api/empleados').request.body.sueldoBase).toBe(817);
+  });
+
+  it('un sueldo menor al SBU no se registra y el mensaje lo dice', async () => {
+    const { fixture, el } = await abrir();
+    llenarBase(el);
+    escribir(el, 'sueldoBase', '300');
+    fixture.detectChanges();
+    expect(el.querySelector('.error-campo')!.textContent).toContain(
+      'No se puede registrar al empleado: el sueldo (300 USD) es menor al salario básico unificado (482 USD)',
+    );
+    el.querySelector('form')!.dispatchEvent(new Event('submit'));
+    http.expectNone('/api/empleados');
+
+    escribir(el, 'sueldoBase', '482');
+    fixture.detectChanges();
+    expect(el.querySelector('.error-campo')).toBeNull();
+    el.querySelector('form')!.dispatchEvent(new Event('submit'));
+    http.expectOne('/api/empleados');
+  });
+
+  it('sin escala en el régimen, el sueldo se escribe a mano', async () => {
+    const { el } = await abrir();
+    expect(el.querySelector('#escalaId')).toBeNull();
+    expect(el.querySelector<HTMLInputElement>('#sueldoBase')!.readOnly).toBe(false);
+  });
+
+  it('en un nivel de mínimo el sueldo se propone, se puede subir y no se puede bajar', async () => {
+    const { fixture, el } = await abrir([...GRADOS, NIVEL_MINIMO]);
+    llenarBase(el);
+    escribir(el, 'escalaId', '21', 'change');
+    fixture.detectChanges();
+    const sueldo = el.querySelector<HTMLInputElement>('#sueldoBase')!;
+    expect(sueldo.value).toBe('495');
+    expect(sueldo.readOnly).toBe(false);
+    expect(el.textContent).toContain('no puede ser menor a');
+
+    escribir(el, 'sueldoBase', '400');
+    fixture.detectChanges();
+    expect(el.querySelector('.error-campo')!.textContent).toContain(
+      'No se puede registrar al empleado: el sueldo (400 USD) es menor al mínimo del nivel B1: Supervisión general (495 USD)',
+    );
+    el.querySelector('form')!.dispatchEvent(new Event('submit'));
+    http.expectNone('/api/empleados');
+
+    escribir(el, 'sueldoBase', '900');
+    el.querySelector('form')!.dispatchEvent(new Event('submit'));
+    const cuerpo = http.expectOne('/api/empleados').request.body;
+    expect(cuerpo.sueldoBase).toBe(900);
+    expect(cuerpo.escalaId).toBe(21);
+  });
+
+  it('con puestos, primero se elige el puesto: muestra su ficha y fija el nivel, el sueldo y el cargo', async () => {
+    const { fixture, el } = await abrir([...GRADOS, NIVEL_MINIMO], [PUESTO]);
+    expect(el.querySelector('#puestoId')).not.toBeNull();
+    expect(el.querySelector('#escalaId')).not.toBeNull(); // el nivel que le toca sigue a la vista
+
+    escribir(el, 'puestoId', '31', 'change');
+    fixture.detectChanges();
+    expect(el.querySelector('.ficha-puesto')!.textContent).toContain('Administrar los recursos.');
+    expect(el.querySelector('.ficha-puesto')!.textContent).toContain('Servicios');
+    expect(el.querySelector('.ficha-puesto')!.textContent).toContain('B1: Supervisión general');
+    expect(el.querySelector<HTMLInputElement>('#sueldoBase')!.value).toBe('495');
+    expect(el.querySelector<HTMLInputElement>('#cargo')!.value).toBe('Administrador / Contador');
+    expect(el.querySelector<HTMLSelectElement>('#escalaId')!.value).toBe('21'); // el del puesto
+  });
+
+  it('con puestos, el select ofrece solo los niveles de la familia del puesto elegido', async () => {
+    const hermano: Grado = { ...NIVEL_MINIMO, id: 22, grado: 3, denominacion: 'B2: Supervisión técnica', rmu: 490 };
+    const otraFamilia: Grado = { ...NIVEL_MINIMO, id: 23, grado: 5, denominacion: 'C1: Operación especializada', rmu: 490 };
+    const { fixture, el } = await abrir([...GRADOS, NIVEL_MINIMO, hermano, otraFamilia], [PUESTO]);
+    const opciones = () => [...el.querySelectorAll('#escalaId option')].map((o) => o.getAttribute('value'));
+    expect(opciones()).toEqual(['']); // sin puesto no hay niveles que ofrecer
+
+    escribir(el, 'puestoId', '31', 'change'); // referencia B1
+    fixture.detectChanges();
+    expect(opciones()).toEqual(['', '21', '22']); // B1 y B2, no C1
+    expect(el.querySelector('#escalaId')!.closest('.campo')!.classList).toContain('c6'); // todo el ancho
+  });
+
+  it('con puestos, se puede elegir otro nivel: cambia el sueldo mínimo, no el cargo', async () => {
+    const otro: Grado = { ...NIVEL_MINIMO, id: 22, grado: 3, denominacion: 'B2: Supervisión técnica', rmu: 490, rmuMax: 650 };
+    const { fixture, el } = await abrir([...GRADOS, NIVEL_MINIMO, otro], [PUESTO]);
+    escribir(el, 'puestoId', '31', 'change');
+    fixture.detectChanges();
+
+    escribir(el, 'escalaId', '22', 'change');
+    fixture.detectChanges();
+    expect(el.querySelector<HTMLInputElement>('#sueldoBase')!.value).toBe('490');
+    expect(el.querySelector<HTMLInputElement>('#cargo')!.value).toBe('Administrador / Contador');
+    expect(el.querySelector('#escalaId option[value="22"]')!.textContent).toContain('a $650');
+  });
+
+  it('con puestos, no se guarda sin puesto y se envía el puesto y su grado', async () => {
+    const { fixture, el } = await abrir([...GRADOS, NIVEL_MINIMO], [PUESTO]);
+    escribir(el, 'cedula', '1801234566');
+    escribir(el, 'nombres', 'Ana Prueba');
+    escribir(el, 'fechaIngreso', '2024-01-10');
+    el.querySelector('form')!.dispatchEvent(new Event('submit'));
+    http.expectNone('/api/empleados'); // falta el puesto
+
+    escribir(el, 'puestoId', '31', 'change');
+    fixture.detectChanges();
+    escribir(el, 'sueldoBase', '800');
+    el.querySelector('form')!.dispatchEvent(new Event('submit'));
+    const cuerpo = http.expectOne('/api/empleados').request.body;
+    expect(cuerpo.puestoId).toBe(31);
+    expect(cuerpo.escalaId).toBe(21);
+    expect(cuerpo.sueldoBase).toBe(800);
+  });
+
+  it('un régimen sin puestos no pide puesto y envía el puesto en nulo', async () => {
+    const { fixture, el } = await abrir([...GRADOS, NIVEL_MINIMO], [PUESTO]);
+    escribir(el, 'regimen', 'LOSEP', 'change');
+    fixture.detectChanges();
+    expect(el.querySelector('#puestoId')).toBeNull();
+    expect(el.querySelector('#escalaId')).not.toBeNull();
+  });
+
   it('un cargo ya escrito no se pisa al elegir el grado', async () => {
     const { fixture, el } = await abrir();
     escribir(el, 'regimen', 'LOSEP', 'change');
@@ -156,6 +297,38 @@ describe('FormularioEmpleado', () => {
     fixture.detectChanges();
     expect(el.querySelector<HTMLInputElement>('#cargo')!.value).toBe('Asistente');
     expect(el.querySelector<HTMLInputElement>('#sueldoBase')!.value).toBe('817');
+  });
+
+  it('el cargo propuesto por un grado sigue al grado, pero uno escrito a mano no', async () => {
+    const { fixture, el } = await abrir();
+    escribir(el, 'regimen', 'LOSEP', 'change');
+    fixture.detectChanges();
+    escribir(el, 'escalaId', '11', 'change');
+    fixture.detectChanges();
+    expect(el.querySelector<HTMLInputElement>('#cargo')!.value).toBe('Servidor Público de Apoyo 3');
+
+    escribir(el, 'escalaId', '12', 'change'); // otro grado: el cargo propuesto se actualiza
+    fixture.detectChanges();
+    expect(el.querySelector<HTMLInputElement>('#cargo')!.value).toBe('Servidor Público 1');
+
+    escribir(el, 'cargo', 'Jefe de bodega'); // ahora lo escribe el usuario
+    escribir(el, 'escalaId', '11', 'change');
+    fixture.detectChanges();
+    expect(el.querySelector<HTMLInputElement>('#cargo')!.value).toBe('Jefe de bodega');
+  });
+
+  it('al cambiar de régimen, el cargo propuesto por el grado que se quita se limpia', async () => {
+    const { fixture, el } = await abrir();
+    escribir(el, 'regimen', 'LOSEP', 'change');
+    fixture.detectChanges();
+    escribir(el, 'escalaId', '11', 'change');
+    fixture.detectChanges();
+
+    escribir(el, 'regimen', 'CODIGO_TRABAJO', 'change');
+    fixture.detectChanges();
+    TestBed.tick();
+    fixture.detectChanges();
+    expect(el.querySelector<HTMLInputElement>('#cargo')!.value).toBe('');
   });
 
   it('si cambia el régimen, el grado que ya no corresponde se quita', async () => {
@@ -169,11 +342,12 @@ describe('FormularioEmpleado', () => {
     fixture.detectChanges();
     TestBed.tick();
     fixture.detectChanges();
-    expect(el.querySelector<HTMLSelectElement>('#escalaId')!.value).toBe('');
+    expect(el.querySelector('#escalaId')).toBeNull(); // el Código del Trabajo no tiene escala
+    expect(el.querySelector<HTMLInputElement>('#sueldoBase')!.value).toBe('');
   });
 
   it('en la LOEP la escala depende de la categoría', async () => {
-    const { fixture, el } = await abrir();
+    const { fixture, el } = await abrir([...GRADOS, GRADO_CODIGO]);
     escribir(el, 'regimen', 'LOEP', 'change');
     fixture.detectChanges(); // aparece el selector de categoría
     escribir(el, 'categoriaLoep', 'servidor', 'change');

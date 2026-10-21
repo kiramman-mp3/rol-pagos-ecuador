@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
-import { EMPLEADO, iniciar } from "./ayuda.ts";
+import { EMPLEADO, iniciar, NIVEL_E2_CT } from "./ayuda.ts";
 import type { Cliente } from "./ayuda.ts";
 
 async function conApi(prueba: (api: Cliente) => Promise<void>) {
@@ -19,7 +19,7 @@ const gradoDe = async (api: Cliente, grado: number, regimen = "LOSEP") =>
 describe("API de escala salarial", () => {
   it("trae la escala de ejemplo de la LOSEP con 22 grados", () =>
     conApi(async (api) => {
-      const escala = (await api.get("/api/escala")).json;
+      const escala = (await api.get("/api/escala?regimen=LOSEP")).json;
       assert.equal(escala.length, 22);
       assert.equal(escala[0].grado, 1);
       assert.equal(escala[0].rmu, 527);
@@ -30,19 +30,31 @@ describe("API de escala salarial", () => {
   it("filtra por régimen", () =>
     conApi(async (api) => {
       assert.equal((await api.get("/api/escala?regimen=LOSEP")).json.length, 22);
-      assert.equal((await api.get("/api/escala?regimen=CODIGO_TRABAJO")).json.length, 0);
+      assert.equal((await api.get("/api/escala?regimen=CODIGO_TRABAJO")).json.length, 11);
+      assert.equal((await api.get("/api/escala?regimen=LOEP")).json.length, 0);
+    }));
+
+  it("trae los 11 niveles del Código del Trabajo como mínimos con su rango", () =>
+    conApi(async (api) => {
+      const escala = (await api.get("/api/escala?regimen=CODIGO_TRABAJO")).json;
+      assert.ok(escala.every((g: { esMinimo: boolean }) => g.esMinimo));
+      assert.equal(escala[0].denominacion, "A: Jefatura");
+      assert.equal(escala[0].rmu, 510);
+      assert.equal(escala[0].rmuMax, 1280);
+      assert.equal(escala[10].id, NIVEL_E2_CT);
+      assert.equal(escala[10].rmuMax, null);
     }));
 
   it("crea, edita y elimina un grado", () =>
     conApi(async (api) => {
       const creado = await api.post("/api/escala", {
-        regimen: "CODIGO_TRABAJO", grado: 1, denominacion: "Operario", rmu: 500, fuente: "Prueba",
+        regimen: "CODIGO_TRABAJO", grado: 20, denominacion: "Operario", rmu: 500, fuente: "Prueba",
       });
       assert.equal(creado.status, 201);
       const id = creado.json.id;
 
       const editado = await api.put(`/api/escala/${id}`, {
-        regimen: "CODIGO_TRABAJO", grado: 1, denominacion: "Operario calificado", rmu: 520,
+        regimen: "CODIGO_TRABAJO", grado: 20, denominacion: "Operario calificado", rmu: 520,
       });
       assert.equal(editado.json.denominacion, "Operario calificado");
       assert.equal(editado.json.rmu, 520);
@@ -69,37 +81,37 @@ describe("empleados y escala salarial", () => {
     conApi(async (api) => {
       const g5 = await gradoDe(api, 5);
       const r = await api.post("/api/empleados", {
-        ...EMPLEADO, regimen: "LOSEP", sueldoBase: g5.rmu, escalaId: g5.id,
+        ...EMPLEADO, puestoId: null, regimen: "LOSEP", sueldoBase: g5.rmu, escalaId: g5.id,
       });
       assert.equal(r.status, 201);
       assert.equal(r.json.escalaId, g5.id);
       assert.deepEqual(r.json.avisos, []);
     }));
 
-  it("avisa, sin bloquear, si el sueldo difiere de la RMU del grado", () =>
+  it("rechaza un sueldo distinto de la RMU del grado", () =>
     conApi(async (api) => {
       const g5 = await gradoDe(api, 5);
       const r = await api.post("/api/empleados", {
-        ...EMPLEADO, regimen: "LOSEP", sueldoBase: 700, escalaId: g5.id,
+        ...EMPLEADO, puestoId: null, regimen: "LOSEP", sueldoBase: 700, escalaId: g5.id,
       });
-      assert.equal(r.status, 201);
-      assert.match(r.json.avisos[0], /difiere de la RMU del grado 5 \(\$675\)/);
+      assert.equal(r.status, 400);
+      assert.match(r.json.errores[0], /debe ser la RMU del grado 5 \(\$675\)/);
     }));
 
   it("un grado de otra escala se rechaza", () =>
     conApi(async (api) => {
       const g5 = await gradoDe(api, 5);
-      const r = await api.post("/api/empleados", { ...EMPLEADO, regimen: "CODIGO_TRABAJO", escalaId: g5.id });
+      const r = await api.post("/api/empleados", { ...EMPLEADO, puestoId: null, regimen: "CODIGO_TRABAJO", escalaId: g5.id });
       assert.equal(r.status, 400);
-      assert.match(r.json.errores[0], /escala LOSEP, no de CODIGO_TRABAJO/);
-      assert.equal((await api.post("/api/empleados", { ...EMPLEADO, regimen: "LOSEP", escalaId: 9999 })).status, 400);
+      assert.ok(r.json.errores.some((e: string) => /escala LOSEP, no de CODIGO_TRABAJO/.test(e)));
+      assert.equal((await api.post("/api/empleados", { ...EMPLEADO, puestoId: null, regimen: "LOSEP", escalaId: 9999 })).status, 400);
     }));
 
   it("un servidor de la LOEP usa la escala de la LOSEP; un obrero no", () =>
     conApi(async (api) => {
       const g7 = await gradoDe(api, 7);
       const servidor = await api.post("/api/empleados", {
-        ...EMPLEADO, regimen: "LOEP", categoriaLoep: "servidor", sueldoBase: g7.rmu, escalaId: g7.id,
+        ...EMPLEADO, puestoId: null, regimen: "LOEP", categoriaLoep: "servidor", sueldoBase: g7.rmu, escalaId: g7.id,
       });
       assert.equal(servidor.status, 201);
       const obrero = await api.post("/api/empleados", {
@@ -108,9 +120,35 @@ describe("empleados y escala salarial", () => {
       assert.equal(obrero.status, 400);
     }));
 
-  it("sin grado, el sueldo es libre", () =>
+  it("un régimen con escala exige elegir un grado", () =>
     conApi(async (api) => {
-      const r = await api.post("/api/empleados", { ...EMPLEADO, regimen: "LOSEP", escalaId: null });
+      const r = await api.post("/api/empleados", { ...EMPLEADO, puestoId: null, regimen: "LOSEP", escalaId: null });
+      assert.equal(r.status, 400);
+      assert.match(r.json.errores[0], /Elige un grado de la escala salarial LOSEP/);
+    }));
+
+  it("en un nivel de mínimo el sueldo puede ser mayor, pero no menor", () =>
+    conApi(async (api) => {
+      const b1 = await gradoDe(api, 2, "CODIGO_TRABAJO"); // B1, mínimo $495
+      const mayor = await api.post("/api/empleados", { ...EMPLEADO, puestoId: 2, sueldoBase: 900, escalaId: b1.id });
+      assert.equal(mayor.status, 201);
+      const menor = await api.post("/api/empleados", { ...EMPLEADO, puestoId: 2, cedula: "1702345677", sueldoBase: 490, escalaId: b1.id });
+      assert.equal(menor.status, 400);
+      assert.match(menor.json.errores[0], /es menor al mínimo del nivel B1: Supervisión general \(\$495\)/);
+    }));
+
+  it("el Código del Trabajo exige elegir el puesto, del que sale el nivel", () =>
+    conApi(async (api) => {
+      const r = await api.post("/api/empleados", { ...EMPLEADO, puestoId: null, escalaId: null });
+      assert.equal(r.status, 400);
+      assert.match(r.json.errores[0], /Elige el puesto del orgánico/);
+    }));
+
+  it("un régimen sin escala no pide grado y deja el sueldo libre", () =>
+    conApi(async (api) => {
+      for (const g of (await api.get("/api/escala?regimen=CODIGO_TRABAJO")).json) await api.del(`/api/escala/${g.id}`);
+      for (const p of (await api.get("/api/puestos")).json) await api.del(`/api/puestos/${p.id}`);
+      const r = await api.post("/api/empleados", { ...EMPLEADO, puestoId: null, escalaId: null });
       assert.equal(r.status, 201);
       assert.equal(r.json.escalaId, null);
     }));
@@ -119,7 +157,7 @@ describe("empleados y escala salarial", () => {
     conApi(async (api) => {
       const g5 = await gradoDe(api, 5);
       const { json: ana } = await api.post("/api/empleados", {
-        ...EMPLEADO, regimen: "LOSEP", sueldoBase: g5.rmu, escalaId: g5.id,
+        ...EMPLEADO, puestoId: null, regimen: "LOSEP", sueldoBase: g5.rmu, escalaId: g5.id,
       });
       await api.del(`/api/escala/${g5.id}`);
       const despues = (await api.get(`/api/empleados/${ana.id}`)).json;
@@ -127,7 +165,7 @@ describe("empleados y escala salarial", () => {
       assert.equal(despues.sueldoBase, g5.rmu);
     }));
 
-  it("en los datos de ejemplo, la asistente de la LOSEP está en el grado 5", () =>
+  it("en los datos de ejemplo, quien es servidor tiene su grado de la escala", () =>
     conApi(async (api) => {
       await api.post("/api/empleados/demo");
       const lucia = (await api.get("/api/empleados")).json.find((e: { nombres: string }) => e.nombres.startsWith("Lucía"));

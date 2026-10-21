@@ -14,10 +14,12 @@ interface Borrador {
   grado: string;
   denominacion: string;
   rmu: string;
+  rmuMax: string;
+  esMinimo: boolean;
   fuente: string;
 }
 
-const VACIO: Borrador = { id: null, grado: '', denominacion: '', rmu: '', fuente: '' };
+const VACIO: Borrador = { id: null, grado: '', denominacion: '', rmu: '', rmuMax: '', esMinimo: false, fuente: '' };
 
 /** Grados con su remuneración mensual unificada, por régimen. */
 @Component({
@@ -28,8 +30,10 @@ const VACIO: Borrador = { id: null, grado: '', denominacion: '', rmu: '', fuente
       <div class="hoja-titulo">
         <h2 id="titulo-escala">Escala salarial</h2>
         <p>
-          Al crear un empleado puedes elegir un grado y el sueldo se llena con su remuneración. La escala de la LOSEP
-          viene de una fuente secundaria (ecu11.com): está <strong>por confirmar</strong> con el Ministerio del Trabajo.
+          Al crear un empleado se elige un grado de esta tabla y el sueldo sale de él. En la LOSEP el sueldo es la
+          remuneración del grado; en los niveles de «mínimo» (Código del Trabajo) puede ser mayor, nunca menor.
+          Las escalas de ejemplo son de fuentes secundarias o de clase: están <strong>por confirmar</strong> con el
+          Ministerio del Trabajo.
         </p>
       </div>
 
@@ -51,7 +55,7 @@ const VACIO: Borrador = { id: null, grado: '', denominacion: '', rmu: '', fuente
               <tr>
                 <th class="num">Grado</th>
                 <th>Puesto</th>
-                <th class="num">Remuneración mensual</th>
+                <th class="num"><span class="th-largo">Remuneración mensual</span><span class="th-corto" aria-hidden="true">Remuneración</span></th>
                 <th>Fuente</th>
                 <th><span class="solo-lectura">Acciones</span></th>
               </tr>
@@ -61,7 +65,10 @@ const VACIO: Borrador = { id: null, grado: '', denominacion: '', rmu: '', fuente
                 <tr>
                   <td class="num">{{ g.grado }}</td>
                   <td>{{ g.denominacion }}</td>
-                  <td class="num">{{ g.rmu | dinero }}</td>
+                  <td class="num">
+                    {{ g.esMinimo ? 'desde ' : '' }}{{ g.rmu | dinero }}
+                    @if (g.rmuMax) { <span class="apoyo pequeno"> hasta {{ g.rmuMax | dinero }}</span> }
+                  </td>
                   <td class="apoyo pequeno">{{ g.fuente }}</td>
                   <td class="num">
                     <button class="boton-texto" type="button" (click)="editar(g)">Editar</button>
@@ -102,6 +109,18 @@ const VACIO: Borrador = { id: null, grado: '', denominacion: '', rmu: '', fuente
             <label for="grado-rmu">Remuneración mensual unificada (USD)</label>
             <input class="entrada num" id="grado-rmu" type="number" min="0.01" step="0.01"
                    [value]="borrador().rmu" (input)="cambiar('rmu', $any($event.target).value)" />
+          </div>
+          <div class="campo c3">
+            <label for="grado-rmu-max">Tope del rango (opcional)</label>
+            <input class="entrada num" id="grado-rmu-max" type="number" min="0.01" step="0.01"
+                   [value]="borrador().rmuMax" (input)="cambiar('rmuMax', $any($event.target).value)" />
+          </div>
+          <div class="campo c3">
+            <label for="grado-minimo">¿La remuneración es un mínimo?</label>
+            <select class="entrada" id="grado-minimo" (change)="cambiarMinimo($any($event.target).value)">
+              <option value="no" [selected]="!borrador().esMinimo">No: el sueldo es exactamente la remuneración</option>
+              <option value="si" [selected]="borrador().esMinimo">Sí: el sueldo puede ser mayor, no menor</option>
+            </select>
           </div>
           <div class="campo c3">
             <label for="grado-fuente">Fuente</label>
@@ -147,9 +166,14 @@ export class EscalaSalarial {
     this.borrador.update((b) => ({ ...b, [campo]: valor }));
   }
 
+  protected cambiarMinimo(valor: string) {
+    this.borrador.update((b) => ({ ...b, esMinimo: valor === 'si' }));
+  }
+
   protected editar(g: Grado) {
     this.borrador.set({
-      id: g.id, grado: String(g.grado), denominacion: g.denominacion, rmu: String(g.rmu), fuente: g.fuente,
+      id: g.id, grado: String(g.grado), denominacion: g.denominacion, rmu: String(g.rmu),
+      rmuMax: g.rmuMax === null ? '' : String(g.rmuMax), esMinimo: g.esMinimo, fuente: g.fuente,
     });
     window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
   }
@@ -174,6 +198,8 @@ export class EscalaSalarial {
       grado: Number(b.grado),
       denominacion: b.denominacion,
       rmu: Number(b.rmu),
+      rmuMax: b.rmuMax === '' ? null : Number(b.rmuMax),
+      esMinimo: b.esMinimo,
       fuente: b.fuente,
     };
     this.guardando.set(true);
