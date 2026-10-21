@@ -1,0 +1,13 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "installCommand": "npm run instalar",
+  "buildCommand": "npm run build",
+  "outputDirectory": "frontend/dist/frontend/browser",
+  "functions": {
+    "api/index.ts": { "includeFiles": "backend/src/migraciones/**" }
+  },
+  "rewrites": [
+    { "source": "/api/(.*)", "destination": "/api/index" },
+    { "source": "/((?!api/).*)", "destination": "/index.html" }
+  ]
+}
